@@ -1,0 +1,87 @@
+<html>
+<head>
+<TITLE>Raster Tool</TITLE>
+</head>
+<body bgcolor="#FFFFFF" text="#000000" link="#0000FF">
+
+<font face="georgia">
+
+<div style="position: absolute; left: 15px; right: 15px; padding: 5;">
+
+<img align="right" hspace=20 src="images/RasterScreen.jpg">
+
+<H2>Using "Rasterize LiDAR Data"</H2>
+
+<p>
+This tool is meant to convert LiDAR point data into various raster products.
+
+<p>
+<h3>Usage:</h3>
+<p>
+<ul>
+<li>Select the input file(s) to rasterize.  Multiple files may be selected to combine into a single raster or separate rasters.
+<li>Select whether to use the first return, last return, or both.
+<li>Input the raster pixel resolution.  The units of this parameter are the same as the horizontal coordinates of the data. 
+<li>Enter the value for pixels where no data exists.
+<li>If the "Interpolate data?" box is checked, the tool will interpolate gaps within the raster.  However, the tool does not extrapolate outside the edges of the data. 
+<li>If the "Use vector mask(s)?" box is checked, the tool will prompt the user to select one or more EVF files.  Pixels within these areas will not be processed.
+<li>If the "Mosaic multiple files?" box is checked, then multiple input files will be combined into a single raster.  If this box is not checked, and multiple input files are selected, a raster will be created for each input file. 
+<li>If the "Ignore outliers?" box is checked, then lidar points whose elevation is five or more standard deviations from the median will be ignored. 
+<li>Set the desired geographic extents of the output raster.  The default values are the overall extents of the selected input file(s). 
+<li>If necessary, set the projection associated with the data.
+<li>Select which products to display.  These include:
+<ul>
+<li><b>Maximum Elevation</b> - The maximum elevation point within each pixel
+<li><b>Minimum Elevation</b> - The minimum elevation point within each pixel
+<li><b>Mean Elevation</b> - The mean of all elevation points within each pixel
+<li><b>Slope</b> - The average slope of all points within each pixel
+<li><b>Aspect</b> - The aspect of the average slope of all points within each pixel
+<li><b>Absolute Roughness</b> - The roughness (standard deviation) of all elevation points within each pixel
+<li><b>Local Roughness</b> - The roughness (standard deviation) of all elevation points within each pixel after the local slope has been removed (de-trended)
+<li><b>Intensity</b> - The mean intensity of all points within each pixel
+<li><b>Point Density</b> - The density of all points within each pixel
+</ul>
+<li>The following products require the LiDAR data to have been processed through the <a href="filter.html">height filtering</a>:
+<ul>
+<li><b>Bare Earth Elevation</b> - The minimum bare earth elevation (data elevation minus vegetation height point within each pixel
+<li><b>Bare Earth Slope</b> - The average slope of all bare earth elevation points within each pixel
+<li><b>Bare Earth Aspect</b> - The aspect of the average slope of all bare earth elevation points within each pixel
+<li><b>Mean Vegetation Height</b> - The mean of all height points within each pixel
+<li><b>Max Vegetation Height</b> - The maximum of all height points within each pixel
+<li><b>Vegetation Roughness</b> - The roughness (standard deviation) of all height points within each pixel
+<li><b>Ground Point Density</b> - The density of ground points within each pixel
+</ul>
+<li>Click "OK"
+<li>Select the output file, or save to memory.  (If multiple files are selected and the "Mosaic multiple files?" box is unchecked, the user will be prompted for an output directory instead.)
+</ul>
+
+<p>
+
+Back to LidarTools <a href="index.html">home page</a>.
+
+<p>
+
+<h3>Notes:</h3>
+<p>
+<ul>
+<li>This tool requires data that are in the LAS format.
+<li>The raster products are saved as one or more ENVI data files, with each product as an individual band.  If a single file is processed, or multiple files mosaicked, the output file is immediately opened in an ENVI display window.
+<li>If multiple input files are selected, this tool may leave artifacts along the seams of the input files.  This is due to processing the input files individually and the resulting lack of points near at the seams.<br>
+<b>Tip:</b> If the input files overlap, then the output raster should be seamless.  Use the <a href="buffer.html">buffering tool</a> to create overlapping LAS files.
+
+<li>This tool currently uses simple nearest neighbor-type interpolation, which may not be optimal in some cases.
+</ul>
+</p>
+
+<P><A HREF="mailto:boisecal@isu.edu">Comments?</A></P>
+
+<hr>
+<center>&bull; Idaho State University &bull; Boise Center Aerospace Laboratory &bull; 322 E. Front Street #240 &bull; Boise, Idaho &bull;  83702 &bull;</center>
+
+</div> 
+
+</font> 
+
+</body>
+</html>
+

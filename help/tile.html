@@ -1,0 +1,55 @@
+<html>
+<head>
+<TITLE>Tiling Tool</TITLE>
+</head>
+<body bgcolor="#FFFFFF" text="#000000" link="#0000FF">
+
+<font face="georgia">
+
+<div style="position: absolute; left: 15px; right: 15px; padding: 5;">
+
+<H2>Using "Tile LAS File(s)"</H2>
+
+<p>
+This tool is meant to separate one or more data files into a specified number of tiles.
+
+<p>
+<img align="right" hspace=20 src="images/TileScreen.jpg">
+<h3>Usage:</h3>
+<p>
+
+<ul>
+<li>Select the input file(s).  
+<li>Specify the number of tile rows and columns to create.  For example, if two rows and three columns are selected, six tile files will be created<sup>1</sup>.
+<li>Input new geographic extents if a subset area is desired.  The default values are the overall extents of the selected input file(s).  (The resulting tiles will evenly divide the subset area.)
+<li>Select the output directory.  The output files will be in LAS format and will be named according to row and column number.  (i.e. "1_1.las", "1_2.las", "2_1.las", etc.)  
+</ul>
+
+<p>
+
+Back to LidarTools <a href="index.html">home page</a>.
+
+<p>
+
+<h3>Notes:</h3>
+<p>
+<ul>
+<li><sup>1</sup>If the geographic extent of the input data is such that no data lies within one of the tiles, no corresponding empty output tile will be created.
+<li>This tool requires data that are in the LAS format.
+<li>The latitudinal and longitudinal extents of the output files will be uniform.
+<li>This tool has been optimized to process very large files.  If input data files are found to be too large to otherwise process, this tool may be used to divide them into smaller, more manageable files.
+</ul>
+</p>
+
+<P><A HREF="mailto:boisecal@isu.edu">Comments?</A></P>
+
+<hr>
+<center>&bull; Idaho State University &bull; Boise Center Aerospace Laboratory &bull; 322 E. Front Street #240 &bull; Boise, Idaho &bull;  83702 &bull;</center>
+
+</div>
+
+</font> 
+
+</body>
+</html>
+
