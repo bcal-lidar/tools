@@ -14,7 +14,7 @@
 ;       Idaho State University
 ;       322 E. Front St., Ste. 240
 ;       Boise, ID  83702
-;       http://geology.isu.edu/BCAL
+;       http://bcal.geology.isu.edu
 ;
 ; CALLING SEQUENCE:
 ;
@@ -44,7 +44,7 @@
 ; This software is OSI Certified Open Source Software.
 ; OSI Certified is a certification mark of the Open Source Initiative.
 ;
-; Copyright � 2006 David Streutker, Idaho State University.
+; Copyright @ 2006 David Streutker, Idaho State University.
 ;
 ; This software is provided "as-is", without any express or
 ; implied warranty. In no event will the authors be held liable

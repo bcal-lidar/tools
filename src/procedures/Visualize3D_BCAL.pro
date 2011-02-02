@@ -66,6 +66,7 @@
 ;       April 2006 - Capability to open full files
 ;        June 2007 - Capability to open multiple files
 ;       April 2010 - Minor bug fixes (Rupesh Shrestha)
+;       July 2010 - Added LAS 1.2 RGB display (Rupesh Shrestha)
 ;
 ;###########################################################################
 ;
@@ -380,7 +381,7 @@ for a=0,n_elements(*info.filesPtr)-1 do begin
 
     dStart = total(nTemp[0:a], /int) - nTemp[a]
 
-    for b=0L,nTemp[a]-1 do data[dStart+b] = assocData[index[b]]
+    for b=0L, nTemp[a]-1 do data[dStart+b] = assocData[index[b]]
 
     free_lun, assocLun
 
@@ -687,9 +688,19 @@ CASE newChange OF
         widget_control, info.buttons.source.angle, set_button=1
         Viz_Surface_BCAL_Update, info
         END
+    'USER' : begin
+        for i=0,n_tags(info.buttons.source)-1 do widget_control, info.buttons.source.(i), set_button=0
+        widget_control, info.buttons.source.user, set_button=1
+        Viz_Surface_BCAL_Update, info
+        END
     'IMAGE' : begin
         for i=0,n_tags(info.buttons.source)-1 do widget_control, info.buttons.source.(i), set_button=0
         widget_control, info.buttons.source.image, set_button=1
+        Viz_Surface_BCAL_Update, info
+        END
+    'LASRGB' : begin
+        for i=0,n_tags(info.buttons.source)-1 do widget_control, info.buttons.source.(i), set_button=0
+        widget_control, info.buttons.source.lasrgb, set_button=1
         Viz_Surface_BCAL_Update, info
         END
 
@@ -771,7 +782,7 @@ if (widget_info(info.buttons.source.height, /button_set)) then begin
 endif
 
 if (widget_info(info.buttons.source.class, /button_set)) then begin
-    info.poly->SetProperty, vert_colors=hist_equal((*info.dataPtr).user, omin=oMin, omax=oMax)
+    info.poly->SetProperty, vert_colors=hist_equal((*info.dataPtr).class, omin=oMin, omax=oMax)
     info.thisColorbar->SetProperty, Hide=0
     oTitle->SetProperty, Strings='Classification Value'
     oTickText->SetProperty, Strings=strcompress([oMin,oMax],/remove)
@@ -789,6 +800,25 @@ if (widget_info(info.buttons.source.angle, /button_set)) then begin
     info.thisColorbar->SetProperty, Hide=0
     oTitle->SetProperty, Strings='Scan Angle'
     oTickText->SetProperty, Strings=strcompress([min((*info.dataPtr).angle-128B,max=maxAngle), maxAngle]-128,/remove)
+endif
+
+if (widget_info(info.buttons.source.user, /button_set)) then begin
+    info.poly->SetProperty, vert_colors=hist_equal((*info.dataPtr).user, omin=oMin, omax=oMax)
+    info.thisColorbar->SetProperty, Hide=0
+    oTitle->SetProperty, Strings='User Data'
+    oTickText->SetProperty, Strings=strcompress([oMin,oMax],/remove)
+endif
+
+if (widget_info(info.buttons.source.LASRGB, /button_set)) then begin
+    imgColors = bytarr(3,n_elements(*info.dataPtr))
+    if info.header.pointformat eq 2 or info.header.pointformat eq 3 then begin
+        imgColors[0,*] = (*info.dataPtr).blue
+        imgColors[1,*] = (*info.dataPtr).green
+        imgColors[2,*] = (*info.dataPtr).red
+        info.poly->SetProperty, vert_colors=imgColors
+        info.thisColorbar->SetProperty, Hide=1
+        oTitle->SetProperty, Strings='LAS RGB'
+    end
 endif
 
 if (widget_info(info.buttons.source.image, /button_set)) then begin
@@ -950,15 +980,6 @@ END
 
 pro Viz_Surface_BCAL_Help, event  
  
-; Error Handler
-Catch, theError
-IF theError NE 0 THEN BEGIN
-   Catch, /Cancel
-   Help, /last_message, output=errText
-   errMsg = dialog_message(errText, /error, title='Error displaying help')
-   return
-ENDIF
-
 compile_opt idl2  
 
   myapp_help_path = ENVI_GET_PATH() + PATH_SEP() + 'save_add' + PATH_SEP() + 'help'  
@@ -1148,7 +1169,9 @@ bHeight = Widget_Button(colorMenu, Value='Vegetation Range', Event_Pro='Viz_Surf
 bClass  = Widget_Button(colorMenu, Value='Classification',   Event_Pro='Viz_Surface_BCAL_Event', UValue='CLASS',  /checked)
 bReturn = Widget_Button(colorMenu, Value='Return Number',    Event_Pro='Viz_Surface_BCAL_Event', UValue='RETURN', /checked)
 bAngle  = Widget_Button(colorMenu, Value='Scan Angle',       Event_Pro='Viz_Surface_BCAL_Event', UValue='ANGLE',  /checked)
+bUser   = Widget_Button(colorMenu, Value='User Data',       Event_Pro='Viz_Surface_BCAL_Event', UValue='USER',  /checked)
 bImage  = Widget_Button(colorMenu, Value='From Image',       Event_Pro='Viz_Surface_BCAL_Event', UValue='IMAGE',  /checked)
+bRGB  = Widget_Button(colorMenu, Value='From RGB (LAS 1.2)', Event_Pro='Viz_Surface_BCAL_Event', UValue='LASRGB',  /checked)
 
 dummy = Widget_Button(styleMenu, Value='Set Surface Color Table', Event_Pro='Viz_Surface_BCAL_Elevation_Colors')
 dummy = Widget_Button(styleMenu, Value='Set Surface Color',       Event_Pro='Viz_Surface_BCAL_Properties', $
@@ -1204,6 +1227,8 @@ buttons = { bDots   : bDots, $                      ; The dot surface button.
                         class   : bClass, $         ; The classification color button.
                         nReturn : bReturn, $        ; The classification color button.
                         angle   : bAngle, $         ; The scan angle color button.
+                        user    : bUser, $          ; The user data field color button.
+                        LASRGB  : bRGB, $           ; The LAS 1.2 RGB color button.                                                
                         image   : bImage }, $       ; The image-based color button.
             bDragL   : bDragL, $                    ; The drag quality LOW button.
             bDragM   : bDragM, $                    ; The drag quality MEDIUM button.

@@ -17,7 +17,7 @@
 ;       Idaho State University
 ;       322 E. Front St., Ste. 240
 ;       Boise, ID  83702
-;       http://geology.isu.edu/BCAL
+;       http://bcal.geology.isu.edu/
 ;
 ; CALLING SEQUENCE:
 ;
@@ -38,6 +38,7 @@
 ;
 ;       Written by David Streutker, March 2006.
 ;       Change from a procedure to a function, July 2007
+;       Added support for LAS 1.2 RGB ancillary image data, June 2010 (Rupesh Shrestha).
 ;
 ;###########################################################################
 ;
@@ -92,6 +93,23 @@ data = {formatD0,  $
     ; If format 1 is requested, add the time field
 
 if pointFormat eq 1 then data = {formatD1, inherits formatD0, time:0D}    ; GPS time field
+
+    ; If format 2 is requested, add the RGB channel value fields
+
+if pointFormat eq 2 then data = {formatD2, inherits formatD0, $
+                                       red   : 0US, $     ; Red image channel value
+                                       green : 0US, $     ; Blue image channel value
+                                       blue  : 0US  $     ; Green image channel value
+                                    }    
+
+    ; If format 3 is requested, add the time field and RGB channel value fields
+                                       
+if pointFormat eq 3 then data = {formatD3, inherits formatD0, $
+                                       time : 0D,  $    ; GPS time field
+                                       red  : 0US, $     ; Red image channel value
+                                       green: 0US, $     ; Blue image channel value
+                                       blue : 0US  $     ; Green image channel value
+                                    }    
 
 return, data
 

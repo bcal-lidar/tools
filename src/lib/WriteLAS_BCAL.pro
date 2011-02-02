@@ -16,7 +16,7 @@
 ;       Idaho State University
 ;       322 E. Front St., Ste. 240
 ;       Boise, ID  83702
-;       http://geology.isu.edu/BCAL
+;       http://bcal.geology.isu.edu/
 ;
 ; CALLING SEQUENCE:
 ;
@@ -39,6 +39,7 @@
 ;       Written by David Streutker, August 2006.
 ;       Added CHECK keyword, March 2007.
 ;       Added RECORDS and NODATA keywords, June 2007.
+;       Added support for LAS 1.2 RGB ancillary image data, June 2010 (Rupesh Shrestha).
 ;
 ;###########################################################################
 ;
@@ -47,7 +48,7 @@
 ; This software is OSI Certified Open Source Software.
 ; OSI Certified is a certification mark of the Open Source Initiative.
 ;
-; Copyright � 2006 David Streutker, Idaho State University.
+; Copyright @ 2006 David Streutker, Idaho State University.
 ;
 ; This software is provided "as-is", without any express or
 ; implied warranty. In no event will the authors be held liable
@@ -79,7 +80,7 @@ compile_opt idl2, logical_predicate
     ; Make sure the header fields are updated
 
 header.signature  = byte('LASF')
-header.softwareID = byte('LidarTools, IDL ' + !version.release)
+header.softwareID = byte('BCAL LidarTools, IDL ' + !version.release)
 
 date = bin_date(systime(/utc))
 day  = julday(date[1],date[2],date[0]) - julday(1,1,date[0]) + 1
@@ -102,8 +103,10 @@ if keyword_set(check) then begin
     if ~ keyword_set(nodata) then begin
 
         header.pointLength = n_tags(data, /data_length)
-        if header.pointLength eq 20 then header.pointFormat = 0 $
-                                    else header.pointFormat = 1
+        if header.pointLength eq 20 then header.pointFormat = 0
+        if header.pointLength eq 26 then header.pointFormat = 2
+        if header.pointLength eq 28 then header.pointFormat = 1
+        if header.pointLength eq 34 then header.pointFormat = 3 
 
         header.nPoints  = n_elements(data)
         header.nReturns = histogram((data.nReturn mod 8), min=1, max=5)
@@ -118,8 +121,10 @@ if keyword_set(check) then begin
 
     endif else begin
 
-        if header.pointFormat then header.pointLength = 28 $
-                              else header.pointLength = 20
+        if header.pointFormat eq 0 then header.pointLength = 20
+        if header.pointFormat eq 2 then header.pointLength = 26
+        if header.pointFormat eq 1 then header.pointLength = 28
+        if header.pointFormat eq 3 then header.pointLength = 34
 
     endelse
 

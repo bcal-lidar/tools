@@ -45,7 +45,7 @@
 ;       Added support for embedded projections, June 2007
 ;       Added ability to export all 5 returns from LAS file and minor fixes, April 2010 (Rupesh Shrestha)
 ;       Added ability to export to ArcGIS shapefile and KML file, April 2010 (Rupesh Shrestha)
-;
+;       Added baloon labels to display attribute data in KML export file, July 2010 (Rupesh Shrestha)
 ;###########################################################################
 ;
 ; LICENSE
@@ -53,7 +53,7 @@
 ; This software is OSI Certified Open Source Software.
 ; OSI Certified is a certification mark of the Open Source Initiative.
 ;
-; Copyright � 2006 David Streutker, Idaho State University.
+; Copyright @ 2006 David Streutker, Idaho State University.
 ;
 ; This software is provided "as-is", without any express or
 ; implied warranty. In no event will the authors be held liable
@@ -143,11 +143,13 @@ if nFiles eq 1 then layerName = 'Boundary of ' + file_basename(inputFiles[0]) $
 dbfAttributes = replicate({Name        : '', $
                            Points      : 0L, $
                            Density     : 0E, $
-                           FirstPts : 0L, $
-                           SecondPts: 0L, $
-                           ThirdPts : 0L, $
-                           FourthPts: 0L, $
-                           FifthPts : 0L}, nFiles)
+                           Swaths      : 0L, $
+                           TotalArea   : 0E, $
+                           FirstPts    : 0L, $
+                           SecondPts   : 0L, $
+                           ThirdPts    : 0L, $
+                           FourthPts   : 0L, $
+                           FifthPts    : 0L}, nFiles)
 
     ; Intitialize the EVF file
 
@@ -171,13 +173,41 @@ if (result.kmlfile eq 1) then begin
     printf, kmlout, '<?xml version="1.0" encoding="UTF-8"?>'
     printf, kmlout, '<kml xmlns="http://www.opengis.net/kml/2.2">'
     printf, kmlout, '<Document>'
-    printf, kmlout, '<Style id="transBluePoly">'
+    printf, kmlout, '<Style id="Features">'
     printf, kmlout, '<LineStyle>'
+    printf, kmlout, '<color>FFFF7000</color>'
     printf, kmlout, '<width>1.5</width>'
     printf, kmlout, '</LineStyle>'  
     printf, kmlout, '<PolyStyle>'  
-    printf, kmlout, '<color>7dff0000</color>' 
-    printf, kmlout, '</PolyStyle>'   
+    printf, kmlout, '<outline>1</outline>'
+    printf, kmlout, '<fill>0</fill>'
+    printf, kmlout, '</PolyStyle>'  
+    printf, kmlout, '<BalloonStyle>'
+    printf, kmlout, '<text><![CDATA['
+    printf, kmlout, '<h3>$[name]</h3>'
+    printf, kmlout, '<table border="1">'
+    printf, kmlout, '<tr><td>Return Density</td><td>$[retDensity]</td></tr>'
+    printf, kmlout, '<tr><td>Area</td><td>$[area]</td></tr>'
+    if (header.pointFormat eq 1) or (header.pointFormat eq 3) then begin
+       printf, kmlout, '<tr><td>Flight lines</td><td>$[nflight]</td></tr>'
+    endif
+    printf, kmlout, '</table><br/>'
+    printf, kmlout, '<table border="1"><tr><td colspan="7">LiDAR Returns</td></tr>'
+    printf, kmlout, '<tr><td></td><td>1st</td><td>2nd</td><td>3rd</td><td>4th</td><td>5th</td><td>All</td></tr>'
+    printf, kmlout, '<tr><td>Total</td><td>$[firstRet]</td><td>$[secondRet]</td><td>$[thirdRet]</td><td>$[fourthRet]</td><td>$[fifthRet]</td><td>$[allRet]</td></tr>'
+    printf, kmlout, '</table><br/>'
+    printf, kmlout, '<table border="1"><tr><td colspan="7">Classification</td></tr>'
+    printf, kmlout, '<tr><td></td><td>Never classified</td><td>Unclassified</td><td>Ground</td><td>Vegetation</td><td>Others</td></tr>'
+    printf, kmlout, '<tr><td>Total</td><td>$[class0]</td><td>$[class1]</td><td>$[class2]</td><td>$[class3]</td><td>$[class4]</td></tr>'
+    printf, kmlout, '</table><br/>'
+    printf, kmlout, '<table border="1">'
+    printf, kmlout, '<tr><td></td><td>Min</td><td>Mean</td><td>Max</td><td>St. Dev</td></tr>'
+    printf, kmlout, '<tr><td>Elevation</td><td>$[minElev]</td><td>$[meanElev]</td><td>$[maxElev]</td><td>$[stdElev]</td></tr>'
+    printf, kmlout, '<tr><td>Intensity</td><td>$[minInt]</td><td>$[meanInt]</td><td>$[maxInt]</td><td>$[stdInt]</td></tr>'
+    printf, kmlout, '<tr><td>Scan angle</td><td>$[minScan]</td><td>$[meanScan]</td><td>$[maxScan]</td><td>$[stdScan]</td></tr>'
+    printf, kmlout, '</table>'
+    printf, kmlout, ']]></text>''
+    printf, kmlout, '</BalloonStyle>'
     printf, kmlout, '</Style>' 
     
     ; define output coordinates
@@ -201,12 +231,37 @@ for a=0, nFiles-1 do begin
 
     ReadLAS_BCAL, inputFiles[a], header, data
 
-;    bPoints  = GetBounds_BCAL(data.east, data.north)
     bPoints  = GetBounds_BCAL(data.east * header.xScale, data.north * header.yScale, precision=precision)
     bArea    = poly_area(data[bPoints].east  * header.xScale + header.xOffset, $
                          data[bPoints].north * header.yScale + header.yOffset)
+    
+    ; count flight lines
+   
+   if (header.pointFormat eq 1) or (header.pointFormat eq 3) then begin
+       minTime = min(data.time, max=maxTime)
+       
+       tMin = floor(minTime)
+       tMax =  ceil(maxTime)
+       tRange = tMax - tMin
+       tHist = histogram(data.time, min=tMin)
+       tLine = ([0,tHist[0:tRange-2]] eq 0) and (tHist[0:tRange-1] ne 0)
+       nLines = total(tLine, /integer)
 
-    nReturns = histogram(data.nReturn mod 8, min=1, max=5)
+   end
+   
+   ; calculate statistics
+   
+   elevmom= moment((data.elev * header.zScale + header.zOffset), maxmoment=2, sdev=sdevelev)
+   intenmom= moment(data.inten, maxmoment=2, sdev=sdevinten)
+   anglemom= moment((data.angle - 128B), maxmoment=2, sdev=sdevangle)
+   
+   ; classification
+   
+   dummy = where(data.class eq 0, cl0cnt)
+   dummy = where(data.class eq 1, cl1cnt)
+   dummy = where(data.class eq 2, cl2cnt)
+   dummy = where(data.class eq 3, cl3cnt)
+   dummy = where(data.class ge 4, cl4cnt)
 
         ; Record the boundary of each input file as a record in the EVF file
 
@@ -219,11 +274,14 @@ for a=0, nFiles-1 do begin
     dbfAttributes[a].Name        = file_basename(inputFiles[a])
     dbfAttributes[a].Points      = header.nPoints
     dbfAttributes[a].Density     = header.nPoints / bArea
-    dbfAttributes[a].FirstPts = nReturns[0]
-    dbfAttributes[a].SecondPts = nReturns[1]
-    dbfAttributes[a].ThirdPts  = nReturns[2]
-    dbfAttributes[a].FourthPts  = nReturns[3]
-    dbfAttributes[a].FifthPts  = nReturns[4]
+    dbfAttributes[a].Swaths      = header.nPoints / bArea
+    if (header.pointFormat eq 1) or (header.pointFormat eq 3) then $
+    dbfAttributes[a].TotalArea   = nLines
+    dbfAttributes[a].FirstPts = header.nReturns[0]
+    dbfAttributes[a].SecondPts = header.nReturns[1]
+    dbfAttributes[a].ThirdPts  = header.nReturns[2]
+    dbfAttributes[a].FourthPts  = header.nReturns[3]
+    dbfAttributes[a].FifthPts  = header.nReturns[4]
     
         ; Process each record for KML file
         
@@ -238,7 +296,37 @@ for a=0, nFiles-1 do begin
 
       printf, kmlout, '<Placemark>'
       printf, kmlout, '<name>' + file_basename(inputFiles[a]) + '</name>'
-      printf, kmlout, '<styleUrl>#transBluePoly</styleUrl>'
+      printf, kmlout, '<styleUrl>#Features</styleUrl>'
+      printf, kmlout, '<ExtendedData>'
+      printf, kmlout, '<Data name="retDensity"><value>'+ strcompress(header.nPoints/bArea)+'</value></Data>'
+      printf, kmlout, '<Data name="area"><value>'+strcompress(bArea)+'</value></Data>
+      if (header.pointFormat eq 1) or (header.pointFormat eq 3) then begin
+        printf, kmlout, '<Data name="nflight"><value>'+strcompress(nLines)+'</value></Data>
+      endif
+      printf, kmlout, '<Data name="allRet"><value>'+strcompress(header.nPoints)+'</value></Data>
+      printf, kmlout, '<Data name="firstRet"><value>'+strcompress(header.nReturns[0])+'</value></Data>
+      printf, kmlout, '<Data name="secondRet"><value>'+strcompress(header.nReturns[1])+'</value></Data>
+      printf, kmlout, '<Data name="thirdRet"><value>'+strcompress(header.nReturns[2])+'</value></Data>
+      printf, kmlout, '<Data name="fourthRet"><value>'+strcompress(header.nReturns[3])+'</value></Data>
+      printf, kmlout, '<Data name="fifthRet"><value>'+strcompress(header.nReturns[4])+'</value></Data>
+      printf, kmlout, '<Data name="class0"><value>'+strcompress(cl0cnt)+'</value></Data>
+      printf, kmlout, '<Data name="class1"><value>'+strcompress(cl1cnt)+'</value></Data>
+      printf, kmlout, '<Data name="class2"><value>'+strcompress(cl2cnt)+'</value></Data>
+      printf, kmlout, '<Data name="class3"><value>'+strcompress(cl3cnt)+'</value></Data>
+      printf, kmlout, '<Data name="class4"><value>'+strcompress(cl4cnt)+'</value></Data>
+      printf, kmlout, '<Data name="minElev"><value>'+strcompress(header.zmin)+'</value></Data>
+      printf, kmlout, '<Data name="meanElev"><value>'+strcompress(elevmom[0])+'</value></Data>
+      printf, kmlout, '<Data name="maxElev"><value>'+strcompress(header.zmax)+'</value></Data>
+      printf, kmlout, '<Data name="stdElev"><value>'+strcompress(sdevelev)+'</value></Data>
+      printf, kmlout, '<Data name="minInt"><value>'+strcompress(min(data.inten, max=maxinten))+'</value></Data>
+      printf, kmlout, '<Data name="meanInt"><value>'+strcompress(intenmom[0])+'</value></Data>
+      printf, kmlout, '<Data name="maxInt"><value>'+strcompress(maxinten)+'</value></Data>
+      printf, kmlout, '<Data name="stdInt"><value>'+strcompress(sdevinten)+'</value></Data>
+      printf, kmlout, '<Data name="minScan"><value>'+strcompress(min(data.angle-128B,max=maxAngle) - 128)+'</value></Data>
+      printf, kmlout, '<Data name="meanScan"><value>'+strcompress(anglemom[0]-128)+'</value></Data>
+      printf, kmlout, '<Data name="maxScan"><value>'+strcompress(maxAngle - 128)+'</value></Data>
+      printf, kmlout, '<Data name="stdScan"><value>'+strcompress(sdevangle)+'</value></Data>
+      printf, kmlout, '</ExtendedData>'
       printf, kmlout, '<MultiGeometry>'
       printf, kmlout, '<Polygon>'
       printf, kmlout, '<outerBoundaryIs>'

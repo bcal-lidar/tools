@@ -14,6 +14,10 @@
 ;       For more information on the filtering method, see:
 ;       Streutker, D. and Glenn, N., 2006. LiDAR measurement of sagebrush steppe vegetation heights.
 ;           Remote Sensing of Environment, 102, 135-145.
+;           
+;       Thresholding procedure is described in:
+;       Tinkham et al., 2011. A Comparison of Two Open Source LiDAR Surface Filtering Algorithms.
+;           Remote Sensing. in review.
 ;
 ; PRODUCTS:
 ;
@@ -48,6 +52,7 @@
 ;       Added ability to choose interpolation method, May 2006.
 ;       Added processing notes, May 2006.
 ;       Improved interoplation, added GetUniqLAS, August 2006.
+;       Added threshold parameter, May 2010 (Rupesh Shrestha).
 ;
 ;###########################################################################
 ;
@@ -80,6 +85,7 @@
 ; web site: http://www.opensource.org.
 ;
 ;###########################################################################
+
 
     ; Begin main program
 
@@ -139,13 +145,19 @@ topBase = widget_auto_base(title='Filter Parameters')
 
     spaBase = widget_base(topBase, /row)
     dummy   = widget_param(spaBase, default=5, prompt='Enter canopy spacing: ', uvalue='cellF', /auto)
-
+    
+    thresBase = widget_base(topBase, /row)
+    dummy   = widget_param(thresBase, default=0, prompt='Enter threshold value: ', uvalue='thresF', /auto)
+    
     intBase = widget_base(topBase, /row)
-    dummy   = widget_pmenu(intBase, list=interpList, default=5, prompt='Select interpolation method', $
+    dummy   = widget_pmenu(intBase, list=interpList, default=6, prompt='Select interpolation method', $
                            uvalue='interpF', /auto)
 
     maxBase = widget_base(topBase, /row)
     dummy   = widget_param(maxBase, default=50, prompt='Enter maximum allowed height: ', uvalue='maxF', /auto)
+    
+    iterBase = widget_base(topBase, /row)
+    dummy   = widget_param(iterBase, default=15, prompt='Maximum iteration: ', uvalue='maxI', /auto)
 
     dummy   = widget_outf(topBase, /directory, prompt='Select output directory', uvalue='outF', /auto)
 
@@ -154,9 +166,11 @@ if (result.accept eq 0) then return
 
 retNum     = result.returnF + 1
 baseScale  = result.cellF
+thresValue = result.thresF
 interpType = interpList[result.interpF]
 userMax    = result.maxF
 outputDir  = result.outF
+iterMax    = result.maxI
 
     ; Set up interpolation parameters for GRIDDATA
 
@@ -236,13 +250,15 @@ noHeight  = 2^16 - 1
 
     ; Set the maximum number of iterations for each cell.  Set up recording parameters.
 
-iterMax = 15
+;iterMax = 15
 
     ; Open processing log file
 
 openw,  logLun, outputDir + '\ProcessingNotes.txt', /get_lun, width=250
 printf, logLun, 'Interpolation Method : ', interpType
 printf, logLun, 'Grid Spacing (m) : ', baseScale
+printf, logLun, 'Threshold (m): ', thresvalue 
+printf, logLun, 'Maximum iteration: ', itermax
 printf, logLun, ' '
 
     ; Begin processesing each file
@@ -273,13 +289,22 @@ for a=0,n_elements(inputFiles)-1 do begin
         ; Read the input data file.
 
     ReadLAS_BCAL, inputFiles[a], header, pData, records=records
+    
+        ; Record file parameters in processing notes
+
+    printf, logLun, inputFiles[a]
+    printf, logLun, 'Total points : ', header.nPoints
+    
     GetUniqLAS_BCAL, header, pData
 
         ; Determine maximum and minimum allowable heights in data units and the minimum allowable difference.
 
     minDiff   = 0.5     / header.zScale
     maxHeight = userMax / header.zScale
-
+    
+        ; threshold
+    tValue = thresValue / header.zScale
+    
         ; Set all heights to noHeight, classifications to 0 (never classified)
 
     pData.source = noHeight
@@ -309,10 +334,6 @@ for a=0,n_elements(inputFiles)-1 do begin
                         + xDim * yDim * (pData.class eq 1),  $
                         reverse_indices=arrayIndex, min=0d, max=xDim*yDim)
 
-        ; Record file parameters in processing notes
-
-    printf, logLun, inputFiles[a]
-    printf, logLun, 'Total points : ', header.nPoints
     printf, logLun, 'Points processed : ', total(arrayHist, /integer)
 
         ; Set up counter which records the number of iterations for each cell.  If the count number
@@ -404,7 +425,7 @@ for a=0,n_elements(inputFiles)-1 do begin
 
                     heights = pData[index].elev - interpLocal
 
-                    low     = where(heights le 0, lowCount, ncomplement=highCount)
+                    low     = where(heights le (tValue/nIter), lowCount, ncomplement=highCount)
 
                         ; Proceed based on whether or not some interpolated points have non-positive values
 
@@ -513,6 +534,7 @@ for a=0,n_elements(inputFiles)-1 do begin
     arrayHist  = 0B
     arrayIndex = 0B
     cellCount  = 0B
+
 
     envi_report_init, base=statBase, /finish
 
