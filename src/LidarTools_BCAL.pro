@@ -101,7 +101,7 @@ envi_define_menu_button, buttonInfo, value='Reproject LAS File(s)', event_pro='R
 envi_define_menu_button, buttonInfo, value='Convert ASCII Data to LAS', event_pro='AsciiToLAS_BCAL', $
     position= 5, ref_value='LAS File', uvalue='ascii'
 
-envi_define_menu_button, buttonInfo, value='Convert LAS Data to ASCII', event_pro='LAS2ASCII_BCAL', $
+envi_define_menu_button, buttonInfo, value='Convert LAS Data to ASCII', event_pro='LASToAscii_BCAL', $
     position= 6, separator=-1, ref_value='LAS File', uvalue='lasascii'
     
    ; LAS Boundary
