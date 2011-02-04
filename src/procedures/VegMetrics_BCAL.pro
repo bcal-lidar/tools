@@ -158,9 +158,6 @@ products = {hmin    :{title:'Height: Minimum', points:1, index:-1, doIt:0}, $
             hp75th  :{title:'Height: 75th Percentile', points:1, index:-1, doIt:0}, $
             hp90th  :{title:'Height: 90th Percentile', points:1, index:-1, doIt:0}, $
             hp95th  :{title:'Height: 95th Percentile', points:1, index:-1, doIt:0}, $
-;            hnmodes :{title:'Height: Number of modes', points:1, index:-1, doIt:0}, $
-;            hmode   :{title:'Height: Value of major mode', points:1, index:-1, doIt:0}, $
-            hmrange :{title:'Height: Difference between min and max modes', points:1, index:-1, doIt:0}, $
             nElev      :{title:'Number of LiDAR returns', points:1, index:-1, doIt:0}, $ 
             vegnElev   :{title:'Number of LiDAR vegetation returns', points:1, index:-1, doIt:0}, $
             gndnElev   :{title:'Number of LiDAR ground returns', points:1, index:-1, doIt:0}, $
@@ -597,9 +594,7 @@ for b=0,nFiles-1 do begin
                         if products.hp90th.doIt then $
                             dataArray[i,k,products.hp90th.index]  = height[sortht[90*nht / 100]]
                         if products.hp95th.doIt then $
-                            dataArray[i,k,products.hp95th.index]  = height[sortht[95*nht / 100]]
-                        if products.hp5th.doIt then $    
-                            dataArray[i,k,products.hmrange.index]  = kurtosis(height)    
+                            dataArray[i,k,products.hp95th.index]  = height[sortht[95*nht / 100]]  
                        
                         crownrt = where(height gt crnt, crwncount, ncomplement=grndcount)
                         grndrt = where(height le grnt, grndcount)

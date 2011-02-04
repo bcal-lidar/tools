@@ -287,7 +287,7 @@ pro HeightGroupsLAS_BCAL, event
       'Map Projection Units:  ' + units, $
       'Note:  Vegetation heights are displayed and input below as integer values.', $
       '     Multiply the vegetation height values by the Z scale factor', $
-      '     to calulate heights in the map projection units.', $
+      '     to calculate heights in the map projection units.', $
       '', $
       'Ground Point Height:                      ' + STRTRIM(groundHeight,2),   $
       'Error Height:                                   ' + STRTRIM(errorHeight,2),   $

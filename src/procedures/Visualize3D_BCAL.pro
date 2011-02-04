@@ -982,9 +982,23 @@ pro Viz_Surface_BCAL_Help, event
  
 compile_opt idl2  
 
-  myapp_help_path = ENVI_GET_PATH() + PATH_SEP() + 'save_add' + PATH_SEP() + 'help'  
-  !HELP_PATH = !HELP_PATH + PATH_SEP(/SEARCH_PATH) + myapp_help_path  
-  ONLINE_HELP, 'viewer', BOOK="help.adp" 
+        oJavaDesktop = OBJ_NEW('IDLJavaObject$Static$JAVA_AWT_DESKTOP', $
+                  'java.awt.Desktop') 
+        
+        oJavaURI = OBJ_NEW('IDLJavaObject$JAVA_NET_URI', 'java.net.URI', $
+                  'http://code.google.com/p/bcal-lidar-tools/wiki/3DViewer') 
+        
+        if (oJavaDesktop->isDesktopSupported()) then begin 
+           
+           oBrowser = oJavaDesktop->getDesktop()
+           
+           oBrowser->browse,oJavaURI 
+           
+           OBJ_DESTROY, oBrowser 
+        
+        endif 
+        
+        OBJ_DESTROY, oJavaURI, oJavaDesktop 
    
 end
 
