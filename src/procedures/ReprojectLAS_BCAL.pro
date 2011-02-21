@@ -199,7 +199,7 @@ for a=0,nFiles-1 do begin
         rIndex = where(records.recordID eq 34735)
 
         if rIndex eq -1 then records = [records,newRecord] $
-                        else records[rIndex] = newRecord
+                        else records[rIndex] = newRecord[rIndex]
 
     endif else records = newRecord
 
