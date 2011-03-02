@@ -557,9 +557,9 @@ for b=0,nFiles-1 do begin
                         ; various products.
                        
                         if products.imin.doIt then $
-                            dataArray[i,k,products.imin.index]   = min(pData[index].inten, max=maxinten)
+                            dataArray[i,k,products.imin.index]   = min(pData[index].inten)
                         if products.imax.doIt then $                                      
-                            dataArray[i,k,products.imax.index]   = maxinten
+                            dataArray[i,k,products.imax.index]   = max(pData[index].inten)
                         if products.imean.doIt then $    
                             dataArray[i,k,products.imean.index]  = mean(pData[index].inten)
                         if products.agcmean.doIt then $    
@@ -571,9 +571,9 @@ for b=0,nFiles-1 do begin
                         if (vegCount ne 0) then begin
                             
                             if products.ivmin.doIt then $  
-                                dataArray[i,k,products.ivmin.index]  = min(pData[vindex].inten, max=maxvinten)
+                                dataArray[i,k,products.ivmin.index]  = min(pData[vindex].inten)
                             if products.ivmax.doIt then $                                      
-                                dataArray[i,k,products.ivmax.index]  = maxvinten
+                                dataArray[i,k,products.ivmax.index]  = max(pData[vindex].inten)
                             if products.ivmean.doIt then $                                      
                                 dataArray[i,k,products.ivmean.index] = mean(pData[vindex].inten)  
                             
@@ -582,9 +582,9 @@ for b=0,nFiles-1 do begin
                         if (bareCount ne 0) then begin
                             
                             if products.ibmin.doIt then $  
-                                dataArray[i,k,products.ibmin.index]  = min(pData[bindex].inten, max=maxvinten)
+                                dataArray[i,k,products.ibmin.index]  = min(pData[bindex].inten)
                             if products.ibmax.doIt then $                                      
-                                dataArray[i,k,products.ibmax.index]  = maxvinten
+                                dataArray[i,k,products.ibmax.index]  = max(pData[bindex].inten)
                             if products.ibmean.doIt then $                                      
                                 dataArray[i,k,products.ibmean.index] = mean(pData[bindex].inten)  
                             
