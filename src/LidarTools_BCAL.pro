@@ -101,7 +101,7 @@ envi_define_menu_button, buttonInfo, value='Reproject LAS File(s)', event_pro='R
 envi_define_menu_button, buttonInfo, value='Convert ASCII Data to LAS', event_pro='AsciiToLAS_BCAL', $
     position= 5, ref_value='LAS File', uvalue='ascii'
 
-envi_define_menu_button, buttonInfo, value='Convert LAS Data to ASCII', event_pro='LASToAscii_BCAL', $
+envi_define_menu_button, buttonInfo, value='Convert LAS Data to ASCII/Shapefile', event_pro='LASToAscii_BCAL', $
     position= 6, separator=-1, ref_value='LAS File', uvalue='lasascii'
     
    ; LAS Boundary
@@ -227,6 +227,9 @@ envi_define_menu_button, buttonInfo, value='Help', /menu, ref_value='BCAL LiDAR'
    
     envi_define_menu_button, buttonInfo, value='Start Help', EVENT_PRO = 'LiDARToolsHelp_BCAL', $
        ref_value='Help', uvalue='LiDARToolsHelp'
+       
+    envi_define_menu_button, buttonInfo, value='Check for Updates...', EVENT_PRO = 'LiDARToolsHelp_BCAL', $
+       ref_value='Help', uvalue='LiDARToolsUpdates'
     
     envi_define_menu_button, buttonInfo, value='About BCAL LiDAR Tools', EVENT_PRO = 'LiDARToolsHelp_BCAL', $
        ref_value='Help', position=last, uvalue='AboutLiDARTools'

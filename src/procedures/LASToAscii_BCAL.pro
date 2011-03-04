@@ -30,6 +30,7 @@
 ;   Removed the message boxes, August 2010 (Rupesh Shrestha).
 ;   Data read/write by chunks - more efficient, August 2010 (Rupesh Shrestha)
 ;   LAS 1.2 support, August 2010 (Rupesh Shrestha)
+;   Added ability to export as ESRI point shapefile, March 2011 (Rupesh Shrestha)
 ;###########################################################################
 ;
 ; LICENSE
@@ -71,14 +72,14 @@ PRO LASToAscii_BCAL, event
       errMsg = dialog_message(errText, /error, title='Error processing request')
       return
    endif
-   
+    
    ; Get the input file(s).
    inputFiles = envi_pickfile(title='Select LAS file(s)', filter='*.las', /multiple_files)
    if (inputFiles[0] eq '') then return
    
    ; Set up delimiter list and field list
    delimiterList = ['comma','tab','semicolon','space','colon','vertical bar'] ; Add fixed width?
-   fieldsList = ['X Y Z', 'X Y Z Intensity', 'X Y Z R G B', 'All available fields']
+   fieldsList = ['X Y Z', 'X Y Z Intensity', 'X Y Z Intensity Return', 'X Y Z R G B', 'All available fields']
    
    ; Get a count of the input files selected for processing
    
@@ -87,7 +88,7 @@ PRO LASToAscii_BCAL, event
    ; Get the output parameters (delimiter, fields, header row, location) from the user.
    ; Set up GUI
    
-   readBase = widget_auto_base(title='Select ASCII Options')
+   readBase = widget_auto_base(title='Select Output Options')
    
    ; Display files selected for conversion
    widgetText = 'LAS file(s) selected for conversion:'
@@ -95,22 +96,26 @@ PRO LASToAscii_BCAL, event
       nextLine = '   ' + STRTRIM(a+1, 1) + ') ' + FILE_BASENAME(inputFiles[a])
       widgetText = [widgetText, nextLine]
    ENDFOR
-   dummy = WIDGET_TEXT(readBase, VALUE=widgetText, YSIZE=nFiles+1)   ; not sure why the +1 is necessary
-   
-   ; Create delimiter drop down menu
-   delimiterBase = WIDGET_BASE(readBase, /row)
-   dummy     = WIDGET_PMENU(delimiterBase, list=delimiterList, default=0, prompt='Select Delimiter: ', $
-      uvalue='fDelimiter', /auto)
+   dummy = WIDGET_TEXT(readBase, VALUE=widgetText, YSIZE=5, /scroll)   ; not sure why the +1 is necessary
       
    ; Create fields drop down menu
    fieldsBase  = WIDGET_BASE(readBase, /row)
    dummy     = WIDGET_PMENU(fieldsBase, list=fieldsList,  default=0, prompt='Select Fields:', $
       uvalue='fFields', /auto)
       
-   ; Create header row yes/no check box
-   headerRowBase  = WIDGET_BASE(readBase, /row)
-   dummy      = WIDGET_MENU(headerRowBase, default_array=[1], list=['Include header row?'], $
-      uvalue='headerRow',  /auto)
+      ; Create header row yes/no check box
+   fTypeBase  = WIDGET_BASE(readBase, /row)
+   dummy      = WIDGET_MENU(fTypeBase, default_array=[1, 0], prompt='Output Type:', list=['Ascii', 'Shapefile'], $
+      uvalue='fType', /auto)
+       
+   
+   ; Create delimiter drop down menu
+   delimiterBase = WIDGET_BASE(readBase, /row)
+   dummy     = WIDGET_PMENU(delimiterBase, list=delimiterList, default=0, prompt='Delimiter: ', $
+      uvalue='fDelimiter', /auto)
+   dummy      = WIDGET_MENU(delimiterBase, default_array=[1], list=['Include header row?'], $
+      uvalue='headerRow',  /auto)  
+      
       
    ; Create output directory selection button and input
    maxBase = WIDGET_BASE(readBase, /row)
@@ -137,6 +142,8 @@ PRO LASToAscii_BCAL, event
    fields = result.fFields
    headerRow = result.headerRow
    outputDir = result.outF
+   fTxt = result.fType[0]
+   fShp = result.fType[1]
    
    ; Set the chunking size
 
@@ -147,15 +154,31 @@ PRO LASToAscii_BCAL, event
       
       ; Write the data to a new file in the output directory
       ; The file name will be the same as the input file with the ".las" changed to ".txt"
-      outputFile = outputDir + '\' + FILE_BASENAME(inputFiles[a], '.las') + '.txt'
+      
+      if fTxt then begin
+          
+          outputTxt = outputDir + '\' + FILE_BASENAME(inputFiles[a], '.las') + '.txt'
+          
+              ; Open output text file for writing
+          OPENW,  logASCII, outputTxt, /get_lun, width=1600
+      
+      endif
+      
+      if fShp then begin
+      
+          outputShp = outputDir + '\' + FILE_BASENAME(inputFiles[a], '.las') + '.shp'
+          
+          mynewshape=OBJ_NEW('IDLffShape', outputShp, /UPDATE, ENTITY_TYPE=11)
+          
+      endif
       
       ; Establish the status reporting widget to report the processing status for each data file.
       statBase = WIDGET_AUTO_BASE(title='Conversion Status')
       statText = ['File' + STRCOMPRESS(a+1) + ' of' + STRCOMPRESS(N_ELEMENTS(inputFiles)), $
          'Input File: ' + FILE_BASENAME(inputFiles[a]), $
-         'Output File: ' + FILE_BASENAME(outputFile), $
-         'Reading LAS...']
+         'Exporting LAS file...']
       ENVI_REPORT_INIT, statText, base=statBase, /interrupt, title='Converting'
+      
       
       ; Read the input data file. 
       ReadLAS_BCAL, inputFiles[a], header, pData, records=records, check=check
@@ -163,31 +186,33 @@ PRO LASToAscii_BCAL, event
       nChunks  = ceil(header.nPoints / chunkSize)
       leftSize = header.nPoints - chunkSize * (nChunks - 1)
       
-      ENVI_REPORT_INIT, base=statBase, /finish
-      statBase = WIDGET_AUTO_BASE(title='Conversion Status')
-      statText = ['File' + STRCOMPRESS(a+1) + ' of' + STRCOMPRESS(N_ELEMENTS(inputFiles)), $
-         'Input File: ' + FILE_BASENAME(inputFiles[a]), $
-         'Output File: ' + FILE_BASENAME(outputFile), $
-         'Writing ASCII...']
-      ENVI_REPORT_INIT, statText, base=statBase, /interrupt, title='Converting'
+      envi_report_inc, statBase, nChunks
+      
       
       ; if all fields was selected and point format EQ 1 then fields=3 (adds GPS time field)
-      IF fields EQ 3 AND header.POINTFORMAT EQ 1 THEN fields=4
-      IF fields EQ 3 AND header.POINTFORMAT EQ 2 THEN fields=5 ;adds RGB
-      IF fields EQ 3 AND header.POINTFORMAT EQ 3 THEN fields=6 ;adds RGB+GPS
-      
-      ; Open output text file for writing
-      OPENW,  logASCII, outputFile, /get_lun, width=1600
-      
+      IF fields EQ 4 AND header.POINTFORMAT EQ 1 THEN fields=5
+      IF fields EQ 4 AND header.POINTFORMAT EQ 2 THEN fields=6 ;adds RGB
+      IF fields EQ 4 AND header.POINTFORMAT EQ 3 THEN fields=7 ;adds RGB+GPS
+    
       ; Write to text file
       CASE fields OF
       
          0: BEGIN ;X Y Z
-            fieldnames = 'X_Easting'+d+'Y_Northing'+d+'Z_Elevation'
-            IF headerRow EQ 1 THEN BEGIN
-               PRINTF,logASCII,fieldnames
-            ENDIF
-            formatStr = '(F0, A, F0, A, F0)'
+            
+            if fTxt then begin
+              fieldnames = 'X_Easting'+d+'Y_Northing'+d+'Z_Elevation'
+              IF headerRow EQ 1 THEN BEGIN
+                 PRINTF,logASCII,fieldnames
+              ENDIF
+              formatStr = '(F0, A, F0, A, F0)'
+            endif
+            
+            if fShp then begin
+              mynewshape->AddAttribute, 'X_Easting', 5, 25, PRECISION=4
+              mynewshape->AddAttribute, 'Y_Northing', 5, 25, PRECISION=4
+              mynewshape->AddAttribute, 'Z_Elevation', 5, 25, PRECISION=4
+            endif
+            
             for b=0L, nChunks -1  do begin
                
                if b eq 0 then startsize = 0L $
@@ -197,16 +222,64 @@ PRO LASToAscii_BCAL, event
                             else tempSize = startsize + chunkSize - 1
                
                for i=startsize, tempsize  do begin
-                 PRINTF, logASCII, (pData[i].east * header.xScale + header.xOffset), d, $
+               
+                 if fTxt then PRINTF, logASCII, (pData[i].east * header.xScale + header.xOffset), d, $
                     (pData[i].north * header.yScale + header.yOffset), d, $
                     (pData[i].elev * header.zScale + header.zOffset), Format=formatStr
+                    
+                 if fShp then begin
+                        
+                        ;Create structure for new entity
+                    
+                    entNew = {IDL_SHAPE_ENTITY}
+                    
+                    ; Define the values for the new entity
+              
+                    entNew.SHAPE_TYPE = 11
+                    entNew.ISHAPE = i
+                    entNew.BOUNDS[0] = pdata[i].east  * header.xScale + header.xOffset
+                    entNew.BOUNDS[1] = pdata[i].north  * header.yScale + header.yOffset
+                    entNew.BOUNDS[2] = pdata[i].elev  * header.zScale + header.zOffset
+                    entNew.BOUNDS[3] = 0.00000000
+                    entNew.BOUNDS[4] = pdata[i].east  * header.xScale + header.xOffset
+                    entNew.BOUNDS[5] = pdata[i].north  * header.yScale + header.yOffset
+                    entNew.BOUNDS[6] = pdata[i].elev  * header.zScale + header.zOffset
+                    entNew.BOUNDS[7] = 0.00000000
+                    
+                    entNew.N_VERTICES = 1 ; take out of example, need as workaround
+                    
+                    ;Create structure for new attributes
+                    
+                    attrNew = mynewshape ->GetAttributes(/ATTRIBUTE_STRUCTURE)
+                    
+                    ;Define the values for the new attributes
+          
+                    attrNew.ATTRIBUTE_0 = (pData[i].east * header.xScale + header.xOffset)
+                    attrNew.ATTRIBUTE_1 = (pData[i].north * header.yScale + header.yOffset)
+                    attrNew.ATTRIBUTE_2 = (pData[i].elev * header.zScale + header.zOffset)
+                    
+                    ;Add the new entity to shapefile
+      
+                    mynewshape -> PutEntity, entNew
+                    
+                    ;Add the attributes to shapefile.
+    
+                    mynewshape -> SetAttributes, i, attrNew  
+                    
+                    ; Clean up the entity
+                    
+                    mynewshape->IDLffShape::DestroyEntity, entNew
+                 
+                 endif
+                 
                endfor
-               
-               ; Initiate status report progress counter... before of after printf?  before seems better to me.
-               ENVI_REPORT_STAT, statBase, i, n_elements(pData), cancel=cancel
+             
+                ; Initiate status report progress counter... 
+               ENVI_REPORT_STAT, statBase, b, nchunks, cancel=cancel
                IF cancel THEN BEGIN
                   ENVI_REPORT_INIT, base=statBase, /finish
-                  FREE_LUN, logASCII
+                  if fTxt then FREE_LUN, logASCII
+                  if fShp then OBJ_DESTROY, mynewshape
                   pData      = 0B
                   RETURN
                ENDIF
@@ -215,11 +288,23 @@ PRO LASToAscii_BCAL, event
          END
          
          1: BEGIN ;X Y Z INTENSITY
-            fieldnames = 'X_Easting'+d+'Y_Northing'+d+'Z_Elevation'+d+'Intensity'
-            IF headerRow EQ 1 THEN BEGIN
+         
+            if fTxt then begin
+              fieldnames = 'X_Easting'+d+'Y_Northing'+d+'Z_Elevation'+d+'Intensity'
+              IF headerRow EQ 1 THEN BEGIN
                PRINTF,logASCII,fieldnames
-            ENDIF
-            formatStr = '(F0, A, F0, A, F0, A, I0)'
+              ENDIF
+              formatStr = '(F0, A, F0, A, F0, A, I0)'
+            endif
+            
+            if fShp then begin
+              mynewshape->AddAttribute, 'X_Easting', 5, 25, PRECISION=4
+              mynewshape->AddAttribute, 'Y_Northing', 5, 25, PRECISION=4
+              mynewshape->AddAttribute, 'Z_Elevation', 5, 25, PRECISION=4
+              mynewshape->AddAttribute, 'Intensity', 3, 4, PRECISION=0
+            endif
+            
+            
             for b=0L, nChunks -1  do begin
                
                if b eq 0 then startsize = 0L $
@@ -228,33 +313,193 @@ PRO LASToAscii_BCAL, event
                if b eq (nChunks-1) then tempSize = startsize + leftSize  - 1  $
                             else tempSize = startsize + chunkSize - 1
                
-               ; Initiate status report progress counter
-               ENVI_REPORT_STAT, statBase, i, n_elements(pData), cancel=cancel
-               IF cancel THEN BEGIN
-                  ENVI_REPORT_INIT, base=statBase, /finish
-                  FREE_LUN, logASCII
-                  pData      = 0B
-                  RETURN
-               ENDIF
-               
                for i=startsize, tempsize  do begin
-                 PRINTF, logASCII, $
+               
+                 if fTxt then PRINTF, logASCII, $
                     (pData[i].east * header.xScale + header.xOffset), d, $
                     (pData[i].north * header.yScale + header.yOffset), d, $
                     (pData[i].elev * header.zScale + header.zOffset), d, $
                     pData[i].inten, $
                     Format=formatStr
+                 
+                 if fShp then begin
+                        
+                        ;Create structure for new entity
+                    
+                    entNew = {IDL_SHAPE_ENTITY}
+                    
+                    ; Define the values for the new entity
+              
+                    entNew.SHAPE_TYPE = 11
+                    entNew.ISHAPE = i
+                    entNew.BOUNDS[0] = pdata[i].east  * header.xScale + header.xOffset
+                    entNew.BOUNDS[1] = pdata[i].north  * header.yScale + header.yOffset
+                    entNew.BOUNDS[2] = pdata[i].elev  * header.zScale + header.zOffset
+                    entNew.BOUNDS[3] = 0.00000000
+                    entNew.BOUNDS[4] = pdata[i].east  * header.xScale + header.xOffset
+                    entNew.BOUNDS[5] = pdata[i].north  * header.yScale + header.yOffset
+                    entNew.BOUNDS[6] = pdata[i].elev  * header.zScale + header.zOffset
+                    entNew.BOUNDS[7] = 0.00000000
+                    
+                    entNew.N_VERTICES = 1 ; take out of example, need as workaround
+                    
+                    ;Create structure for new attributes
+                    
+                    attrNew = mynewshape ->GetAttributes(/ATTRIBUTE_STRUCTURE)
+                    
+                    ;Define the values for the new attributes
+          
+                    attrNew.ATTRIBUTE_0 = (pData[i].east * header.xScale + header.xOffset)
+                    attrNew.ATTRIBUTE_1 = (pData[i].north * header.yScale + header.yOffset)
+                    attrNew.ATTRIBUTE_2 = (pData[i].elev * header.zScale + header.zOffset)
+                    attrNew.ATTRIBUTE_3 = pData[i].inten
+                    
+                    ;Add the new entity to shapefile
+      
+                    mynewshape -> PutEntity, entNew
+                    
+                    ;Add the attributes to shapefile.
+    
+                    mynewshape -> SetAttributes, i, attrNew  
+                    
+                    ; Clean up the entity
+                    
+                    mynewshape->IDLffShape::DestroyEntity, entNew
+                 
+                 endif
+                    
                endfor
+               
+                ; Initiate status report progress counter... 
+               ENVI_REPORT_STAT, statBase, b, nchunks, cancel=cancel
+               IF cancel THEN BEGIN
+                  ENVI_REPORT_INIT, base=statBase, /finish
+                  if fTxt then FREE_LUN, logASCII
+                  if fShp then OBJ_DESTROY, mynewshape
+                  pData      = 0B
+                  RETURN
+               ENDIF
                
             ENDFOR
          END
          
-         2: BEGIN ;X Y Z R G B
-            fieldnames = 'X_Easting'+d+'Y_Northing'+d+'Z_Elevation'+d+'R'+d+'G'+d+'B'
-            IF headerRow EQ 1 THEN BEGIN
-               PRINTF,logASCII,fieldnames
-            ENDIF
-            formatStr = '(F0, A, F0, A, F0, A, I0, A, I0, A, I0)'
+         2: BEGIN ;X Y Z INTENSITY ReturnNo 
+            
+            if fTxt then begin
+              fieldnames = 'X_Easting'+d+'Y_Northing'+d+'Z_Elevation'+d+'Intensity'+d+'ReturnNum'
+              IF headerRow EQ 1 THEN BEGIN
+                PRINTF,logASCII,fieldnames
+              ENDIF
+              formatStr = '(F0, A, F0, A, F0, A, I0, A, I0)'
+            endif
+            
+            if fShp then begin
+              mynewshape->AddAttribute, 'X_Easting', 5, 25, PRECISION=4
+              mynewshape->AddAttribute, 'Y_Northing', 5, 25, PRECISION=4
+              mynewshape->AddAttribute, 'Z_Elevation', 5, 25, PRECISION=4
+              mynewshape->AddAttribute, 'Intensity', 3, 4, PRECISION=0
+              mynewshape->AddAttribute, 'ReturnNum', 3, 2, PRECISION=0
+            endif
+            
+            for b=0L, nChunks -1  do begin
+               
+               if b eq 0 then startsize = 0L $
+                  else startsize = tempsize+1
+        
+               if b eq (nChunks-1) then tempSize = startsize + leftSize  - 1  $
+                            else tempSize = startsize + chunkSize - 1
+ 
+               for i=startsize, tempsize  do begin
+                 
+                 if fTxt then PRINTF, logASCII, $
+                    (pData[i].east * header.xScale + header.xOffset), d, $
+                    (pData[i].north * header.yScale + header.yOffset), d, $
+                    (pData[i].elev * header.zScale + header.zOffset), d, $
+                    pData[i].inten, d , $
+                    (pData[i].nReturn MOD 8),  $ 
+                    Format=formatStr
+                  
+                  if fShp then begin
+                        
+                        ;Create structure for new entity
+                    
+                    entNew = {IDL_SHAPE_ENTITY}
+                    
+                    ; Define the values for the new entity
+              
+                    entNew.SHAPE_TYPE = 11
+                    entNew.ISHAPE = i
+                    entNew.BOUNDS[0] = pdata[i].east  * header.xScale + header.xOffset
+                    entNew.BOUNDS[1] = pdata[i].north  * header.yScale + header.yOffset
+                    entNew.BOUNDS[2] = pdata[i].elev  * header.zScale + header.zOffset
+                    entNew.BOUNDS[3] = 0.00000000
+                    entNew.BOUNDS[4] = pdata[i].east  * header.xScale + header.xOffset
+                    entNew.BOUNDS[5] = pdata[i].north  * header.yScale + header.yOffset
+                    entNew.BOUNDS[6] = pdata[i].elev  * header.zScale + header.zOffset
+                    entNew.BOUNDS[7] = 0.00000000
+                    
+                    entNew.N_VERTICES = 1 ; take out of example, need as workaround
+                    
+                    ;Create structure for new attributes
+                    
+                    attrNew = mynewshape ->GetAttributes(/ATTRIBUTE_STRUCTURE)
+                    
+                    ;Define the values for the new attributes
+          
+                    attrNew.ATTRIBUTE_0 = (pData[i].east * header.xScale + header.xOffset)
+                    attrNew.ATTRIBUTE_1 = (pData[i].north * header.yScale + header.yOffset)
+                    attrNew.ATTRIBUTE_2 = (pData[i].elev * header.zScale + header.zOffset)
+                    attrNew.ATTRIBUTE_3 = pData[i].inten
+                    attrNew.ATTRIBUTE_4 = (pData[i].nReturn MOD 8)
+                    
+                    ;Add the new entity to shapefile
+      
+                    mynewshape -> PutEntity, entNew
+                    
+                    ;Add the attributes to shapefile.
+    
+                    mynewshape -> SetAttributes, i, attrNew  
+                    
+                    ; Clean up the entity
+                    
+                    mynewshape->IDLffShape::DestroyEntity, entNew
+                 
+                 endif  
+                  
+               endfor
+            
+                  ; Initiate status report progress counter... 
+               ENVI_REPORT_STAT, statBase, b, nchunks, cancel=cancel
+               IF cancel THEN BEGIN
+                  ENVI_REPORT_INIT, base=statBase, /finish
+                  if fTxt then FREE_LUN, logASCII
+                  if fShp then OBJ_DESTROY, mynewshape
+                  pData      = 0B
+                  RETURN
+               ENDIF
+                  
+            ENDFOR
+         END
+         
+         3: BEGIN ;X Y Z R G B
+            
+            if fTxt then begin
+              fieldnames = 'X_Easting'+d+'Y_Northing'+d+'Z_Elevation'+d+'R'+d+'G'+d+'B'
+              IF headerRow EQ 1 THEN BEGIN
+                PRINTF,logASCII,fieldnames
+              ENDIF
+              formatStr = '(F0, A, F0, A, F0, A, I0, A, I0, A, I0)'
+            endif
+            
+            if fShp then begin
+              mynewshape->AddAttribute, 'X_Easting', 5, 25, PRECISION=4
+              mynewshape->AddAttribute, 'Y_Northing', 5, 25, PRECISION=4
+              mynewshape->AddAttribute, 'Z_Elevation', 5, 25, PRECISION=4
+              mynewshape->AddAttribute, 'Red', 3, 2, PRECISION=0
+              mynewshape->AddAttribute, 'Green', 3, 2, PRECISION=0
+              mynewshape->AddAttribute, 'Blue', 3, 2, PRECISION=0
+            endif
+            
             for b=0L, nChunks -1  do begin
                
                if b eq 0 then startsize = 0L $
@@ -263,17 +508,9 @@ PRO LASToAscii_BCAL, event
                if b eq (nChunks-1) then tempSize = startsize + leftSize  - 1  $
                             else tempSize = startsize + chunkSize - 1
                
-               ; Initiate status report progress counter
-               ENVI_REPORT_STAT, statBase, i, n_elements(pData), cancel=cancel
-               IF cancel THEN BEGIN
-                  ENVI_REPORT_INIT, base=statBase, /finish
-                  FREE_LUN, logASCII
-                  pData      = 0B
-                  RETURN
-               ENDIF
-               
                for i=startsize, tempsize  do begin
-                 PRINTF, logASCII, $
+                 
+                 if fTxt then PRINTF, logASCII, $
                     (pData[i].east * header.xScale + header.xOffset), d, $
                     (pData[i].north * header.yScale + header.yOffset), d, $
                     (pData[i].elev * header.zScale + header.zOffset), d, $
@@ -281,20 +518,97 @@ PRO LASToAscii_BCAL, event
                     pData[i].green,d, $
                     pData[i].blue, $
                     Format=formatStr
+                 
+                 if fShp then begin
+                        
+                        ;Create structure for new entity
+                    
+                    entNew = {IDL_SHAPE_ENTITY}
+                    
+                    ; Define the values for the new entity
+              
+                    entNew.SHAPE_TYPE = 11
+                    entNew.ISHAPE = i
+                    entNew.BOUNDS[0] = pdata[i].east  * header.xScale + header.xOffset
+                    entNew.BOUNDS[1] = pdata[i].north  * header.yScale + header.yOffset
+                    entNew.BOUNDS[2] = pdata[i].elev  * header.zScale + header.zOffset
+                    entNew.BOUNDS[3] = 0.00000000
+                    entNew.BOUNDS[4] = pdata[i].east  * header.xScale + header.xOffset
+                    entNew.BOUNDS[5] = pdata[i].north  * header.yScale + header.yOffset
+                    entNew.BOUNDS[6] = pdata[i].elev  * header.zScale + header.zOffset
+                    entNew.BOUNDS[7] = 0.00000000
+                    
+                    entNew.N_VERTICES = 1 ; take out of example, need as workaround
+                    
+                    ;Create structure for new attributes
+                    
+                    attrNew = mynewshape ->GetAttributes(/ATTRIBUTE_STRUCTURE)
+                    
+                    ;Define the values for the new attributes
+          
+                    attrNew.ATTRIBUTE_0 = (pData[i].east * header.xScale + header.xOffset)
+                    attrNew.ATTRIBUTE_1 = (pData[i].north * header.yScale + header.yOffset)
+                    attrNew.ATTRIBUTE_2 = (pData[i].elev * header.zScale + header.zOffset)
+                    attrNew.ATTRIBUTE_3 = pData[i].red
+                    attrNew.ATTRIBUTE_4 = pData[i].green
+                    attrNew.ATTRIBUTE_5 = pData[i].blue
+                    
+                    ;Add the new entity to shapefile
+      
+                    mynewshape -> PutEntity, entNew
+                    
+                    ;Add the attributes to shapefile.
+    
+                    mynewshape -> SetAttributes, i, attrNew  
+                    
+                    ; Clean up the entity
+                    
+                    mynewshape->IDLffShape::DestroyEntity, entNew
+                 
+                 endif  
+                
                endfor
-               
+                            ; Initiate status report progress counter... 
+               ENVI_REPORT_STAT, statBase, b, nchunks, cancel=cancel
+               IF cancel THEN BEGIN
+                  ENVI_REPORT_INIT, base=statBase, /finish
+                  if fTxt then FREE_LUN, logASCII
+                  if fShp then OBJ_DESTROY, mynewshape
+                  pData      = 0B
+                  RETURN
+               ENDIF
+                  
             ENDFOR
          END
          
-         3:  BEGIN  ;ALL FIELDS POINT FORMAT 0
-         
-            fieldnames = 'X_Easting'+d+'Y_Northing'+d+'Z_Elevation'+d+'Intensity'+d+$
-               'ReturnNum'+d+'NumOfReturns'+d+'ScanDirFlag'+d+'EdgeFlightLine'+d+$
-               'Classification'+d+'ScanAngleRank'+d+'UserData'+d+'PointSourceID'
-               
-            IF headerRow EQ 1 THEN PRINTF,logASCII,fieldnames
+         4:  BEGIN  ;ALL FIELDS POINT FORMAT 0
             
-            formatStr = '(F0, A, F0, A, F0, A, I0, A, I0, A, I0, A, I0, A, I0, A, I0, A, F0, A, I0, A, I0)'
+            if fTxt then begin
+            
+              fieldnames = 'X_Easting'+d+'Y_Northing'+d+'Z_Elevation'+d+'Intensity'+d+$
+                 'ReturnNum'+d+'NumOfReturns'+d+'ScanDirFlag'+d+'EdgeFlightLine'+d+$
+                 'Classification'+d+'ScanAngleRank'+d+'UserData'+d+'PointSourceID'
+                 
+              IF headerRow EQ 1 THEN PRINTF,logASCII,fieldnames
+              
+              formatStr = '(F0, A, F0, A, F0, A, I0, A, I0, A, I0, A, I0, A, I0, A, I0, A, F0, A, I0, A, I0)'
+              
+            endif
+            
+            if fShp then begin
+              mynewshape->AddAttribute, 'X_Easting', 5, 25, PRECISION=4
+              mynewshape->AddAttribute, 'Y_Northing', 5, 25, PRECISION=4
+              mynewshape->AddAttribute, 'Z_Elevation', 5, 25, PRECISION=4
+              mynewshape->AddAttribute, 'Intensity', 3, 4, PRECISION=0
+              mynewshape->AddAttribute, 'ReturnNum', 3, 2, PRECISION=0
+              mynewshape->AddAttribute, 'NumOfReturns', 3, 2, PRECISION=0
+              mynewshape->AddAttribute, 'ScanDirFlag', 3, 2, PRECISION=0
+              mynewshape->AddAttribute, 'EdgeFlightLine', 3, 2, PRECISION=0
+              mynewshape->AddAttribute, 'Classification', 3, 2, PRECISION=0
+              mynewshape->AddAttribute, 'ScanAngleRank', 5, 10, PRECISION=4
+              mynewshape->AddAttribute, 'UserData', 3, 10, PRECISION=0
+              mynewshape->AddAttribute, 'PointSourceID', 3, 10, PRECISION=0
+            endif
             
             for b=0L, nChunks -1  do begin
                
@@ -304,18 +618,9 @@ PRO LASToAscii_BCAL, event
                if b eq (nChunks-1) then tempSize = startsize + leftSize  - 1  $
                             else tempSize = startsize + chunkSize - 1
                
-               ; Initiate status report progress counter
-               ENVI_REPORT_STAT, statBase, i, n_elements(pData), cancel=cancel
-               IF cancel THEN BEGIN
-                  ENVI_REPORT_INIT, base=statBase, /finish
-                  FREE_LUN, logASCII
-                  pData      = 0B
-                  RETURN
-               ENDIF
-               
                for i=startsize, tempsize  do begin
                
-                 printf, logASCII, $
+                 if fTxt then printf, logASCII, $
                     (pData[i].east * header.xScale + header.xOffset), d, $      ; X_Easting:  X * X scale factor + X offset
                     (pData[i].north * header.yScale + header.yOffset), d, $     ; Y_Northing:  Y * Y scale factor + Y offset
                     (pData[i].elev * header.zScale + header.zOffset), d, $      ; Z_Elevation:  Z * Z scale factor + Z offset
@@ -330,20 +635,104 @@ PRO LASToAscii_BCAL, event
                     pData[i].source, $                                          ; Point Source ID
                     Format=formatStr
               
+                 if fShp then begin
+                        
+                        ;Create structure for new entity
+                    
+                    entNew = {IDL_SHAPE_ENTITY}
+                    
+                    ; Define the values for the new entity
+              
+                    entNew.SHAPE_TYPE = 11
+                    entNew.ISHAPE = i
+                    entNew.BOUNDS[0] = pdata[i].east  * header.xScale + header.xOffset
+                    entNew.BOUNDS[1] = pdata[i].north  * header.yScale + header.yOffset
+                    entNew.BOUNDS[2] = pdata[i].elev  * header.zScale + header.zOffset
+                    entNew.BOUNDS[3] = 0.00000000
+                    entNew.BOUNDS[4] = pdata[i].east  * header.xScale + header.xOffset
+                    entNew.BOUNDS[5] = pdata[i].north  * header.yScale + header.yOffset
+                    entNew.BOUNDS[6] = pdata[i].elev  * header.zScale + header.zOffset
+                    entNew.BOUNDS[7] = 0.00000000
+                    
+                    entNew.N_VERTICES = 1 ; take out of example, need as workaround
+                    
+                    ;Create structure for new attributes
+                    
+                    attrNew = mynewshape ->GetAttributes(/ATTRIBUTE_STRUCTURE)
+                    
+                    ;Define the values for the new attributes
+          
+                    attrNew.ATTRIBUTE_0 = (pData[i].east * header.xScale + header.xOffset)
+                    attrNew.ATTRIBUTE_1 = (pData[i].north * header.yScale + header.yOffset)
+                    attrNew.ATTRIBUTE_2 = (pData[i].elev * header.zScale + header.zOffset)
+                    attrNew.ATTRIBUTE_3 = pData[i].inten
+                    attrNew.ATTRIBUTE_4 = (pData[i].nReturn MOD 8)
+                    attrNew.ATTRIBUTE_5 = (floor(pData[i].nReturn/8) MOD 8)
+                    attrNew.ATTRIBUTE_6 = (floor(pData[i].nReturn/64) MOD 2)
+                    attrNew.ATTRIBUTE_7 = (floor(pData[i].nReturn/128) MOD 2)
+                    attrNew.ATTRIBUTE_8 = pData[i].class
+                    attrNew.ATTRIBUTE_9 = pData[i].angle-(256*(floor(pData[i].angle/128) MOD 2))
+                    attrNew.ATTRIBUTE_10 = pData[i].user
+                    attrNew.ATTRIBUTE_11 = pData[i].source
+                    
+                    ;Add the new entity to shapefile
+      
+                    mynewshape -> PutEntity, entNew
+                    
+                    ;Add the attributes to shapefile.
+    
+                    mynewshape -> SetAttributes, i, attrNew  
+                    
+                    ; Clean up the entity
+                    
+                    mynewshape->IDLffShape::DestroyEntity, entNew
+                 
+                 endif 
+                 
               endfor
               
+                ; Initiate status report progress counter... 
+               ENVI_REPORT_STAT, statBase, b, nchunks, cancel=cancel
+               IF cancel THEN BEGIN
+                  ENVI_REPORT_INIT, base=statBase, /finish
+                  if fTxt then FREE_LUN, logASCII
+                  if fShp then OBJ_DESTROY, mynewshape
+                  pData      = 0B
+                  RETURN
+               ENDIF
+               
             ENDFOR
          END
          
-         4:  BEGIN   ;ALL FIELDS POINT FORMAT 1 (includes GPS_TIME)
+         5:  BEGIN   ;ALL FIELDS POINT FORMAT 1 (includes GPS_TIME)
          
-            fieldnames = 'X_Easting'+d+'Y_Northing'+d+'Z_Elevation'+d+'Intensity'+d+$
-               'ReturnNum'+d+'NumOfReturns'+d+'ScanDirFlag'+d+'EdgeFlightLine'+d+$
-               'Classification'+d+'ScanAngleRank'+d+'UserData'+d+'PointSourceID'+d+'GPS_TIME'
-               
-            IF headerRow EQ 1 THEN PRINTF,logASCII,fieldnames
+            if fTxt then begin
             
-            formatStr = '(F0, A, F0, A, F0, A, I0, A, I0, A, I0, A, I0, A, I0, A, I0, A, F0, A, I0, A, I0, A, F0)'
+              fieldnames = 'X_Easting'+d+'Y_Northing'+d+'Z_Elevation'+d+'Intensity'+d+$
+                 'ReturnNum'+d+'NumOfReturns'+d+'ScanDirFlag'+d+'EdgeFlightLine'+d+$
+                 'Classification'+d+'ScanAngleRank'+d+'UserData'+d+'PointSourceID'+d+'GPS_TIME'
+                 
+              IF headerRow EQ 1 THEN PRINTF,logASCII,fieldnames
+              
+              formatStr = '(F0, A, F0, A, F0, A, I0, A, I0, A, I0, A, I0, A, I0, A, I0, A, F0, A, I0, A, I0, A, F0)'
+            
+            endif
+            
+            if fShp then begin
+              mynewshape->AddAttribute, 'X_Easting', 5, 25, PRECISION=4
+              mynewshape->AddAttribute, 'Y_Northing', 5, 25, PRECISION=4
+              mynewshape->AddAttribute, 'Z_Elevation', 5, 25, PRECISION=4
+              mynewshape->AddAttribute, 'Intensity', 3, 4, PRECISION=0
+              mynewshape->AddAttribute, 'ReturnNum', 3, 2, PRECISION=0
+              mynewshape->AddAttribute, 'NumOfReturns', 3, 2, PRECISION=0
+              mynewshape->AddAttribute, 'ScanDirFlag', 3, 2, PRECISION=0
+              mynewshape->AddAttribute, 'EdgeFlightLine', 3, 2, PRECISION=0
+              mynewshape->AddAttribute, 'Classification', 3, 2, PRECISION=0
+              mynewshape->AddAttribute, 'ScanAngleRank', 5, 10, PRECISION=4
+              mynewshape->AddAttribute, 'UserData', 3, 10, PRECISION=0
+              mynewshape->AddAttribute, 'PointSourceID', 3, 10, PRECISION=0
+              mynewshape->AddAttribute, 'GPS_TIME', 5, 12, PRECISION=4
+            endif
             
            for b=0L, nChunks -1  do begin
            
@@ -352,19 +741,10 @@ PRO LASToAscii_BCAL, event
         
                if b eq (nChunks-1) then tempSize = startsize + leftSize  - 1  $
                             else tempSize = startsize + chunkSize - 1
-                            
-               ; Initiate status report progress counter
-               ENVI_REPORT_STAT, statBase, i, n_elements(pData), cancel=cancel
-               IF cancel THEN BEGIN
-                  ENVI_REPORT_INIT, base=statBase, /finish
-                  FREE_LUN, logASCII
-                  pData      = 0B
-                  RETURN
-               ENDIF
                
                for i=startsize, tempsize  do begin
                
-                   printf, logASCII, $
+                   if fTxt then printf, logASCII, $
                       (pData[i].east * header.xScale + header.xOffset), d, $      ; X_Easting:  X * X scale factor + X offset
                       (pData[i].north * header.yScale + header.yOffset), d, $     ; Y_Northing:  Y * Y scale factor + Y offset
                       (pData[i].elev * header.zScale + header.zOffset), d, $      ; Z_Elevation:  Z * Z scale factor + Z offset
@@ -379,22 +759,109 @@ PRO LASToAscii_BCAL, event
                       pData[i].source,d, $                                        ; Point Source ID
                       pData[i].time, $                                            ; GPS Time
                       Format=formatStr
-               
+                   
+                   if fShp then begin
+                        
+                        ;Create structure for new entity
+                    
+                    entNew = {IDL_SHAPE_ENTITY}
+                    
+                    ; Define the values for the new entity
+              
+                    entNew.SHAPE_TYPE = 11
+                    entNew.ISHAPE = i
+                    entNew.BOUNDS[0] = pdata[i].east  * header.xScale + header.xOffset
+                    entNew.BOUNDS[1] = pdata[i].north  * header.yScale + header.yOffset
+                    entNew.BOUNDS[2] = pdata[i].elev  * header.zScale + header.zOffset
+                    entNew.BOUNDS[3] = 0.00000000
+                    entNew.BOUNDS[4] = pdata[i].east  * header.xScale + header.xOffset
+                    entNew.BOUNDS[5] = pdata[i].north  * header.yScale + header.yOffset
+                    entNew.BOUNDS[6] = pdata[i].elev  * header.zScale + header.zOffset
+                    entNew.BOUNDS[7] = 0.00000000
+                    
+                    entNew.N_VERTICES = 1 ; take out of example, need as workaround
+                    
+                    ;Create structure for new attributes
+                    
+                    attrNew = mynewshape ->GetAttributes(/ATTRIBUTE_STRUCTURE)
+                    
+                    ;Define the values for the new attributes
+          
+                    attrNew.ATTRIBUTE_0 = (pData[i].east * header.xScale + header.xOffset)
+                    attrNew.ATTRIBUTE_1 = (pData[i].north * header.yScale + header.yOffset)
+                    attrNew.ATTRIBUTE_2 = (pData[i].elev * header.zScale + header.zOffset)
+                    attrNew.ATTRIBUTE_3 = pData[i].inten
+                    attrNew.ATTRIBUTE_4 = (pData[i].nReturn MOD 8)
+                    attrNew.ATTRIBUTE_5 = (floor(pData[i].nReturn/8) MOD 8)
+                    attrNew.ATTRIBUTE_6 = (floor(pData[i].nReturn/64) MOD 2)
+                    attrNew.ATTRIBUTE_7 = (floor(pData[i].nReturn/128) MOD 2)
+                    attrNew.ATTRIBUTE_8 = pData[i].class
+                    attrNew.ATTRIBUTE_9 = pData[i].angle-(256*(floor(pData[i].angle/128) MOD 2))
+                    attrNew.ATTRIBUTE_10 = pData[i].user
+                    attrNew.ATTRIBUTE_11 = pData[i].source
+                    attrNew.ATTRIBUTE_12 = pData[i].time
+                    
+                    ;Add the new entity to shapefile
+      
+                    mynewshape -> PutEntity, entNew
+                    
+                    ;Add the attributes to shapefile.
+    
+                    mynewshape -> SetAttributes, i, attrNew  
+                    
+                    ; Clean up the entity
+                    
+                    mynewshape->IDLffShape::DestroyEntity, entNew
+                 
+                 endif
                endfor
                
+                               ; Initiate status report progress counter... 
+               ENVI_REPORT_STAT, statBase, b, nchunks, cancel=cancel
+               IF cancel THEN BEGIN
+                  ENVI_REPORT_INIT, base=statBase, /finish
+                  if fTxt then FREE_LUN, logASCII
+                  if fShp then OBJ_DESTROY, mynewshape
+                  pData      = 0B
+                  RETURN
+               ENDIF
                
             ENDFOR
          END
          
-         5:  BEGIN   ;ALL FIELDS POINT FORMAT 2 (includes RGB)
+         6:  BEGIN   ;ALL FIELDS POINT FORMAT 2 (includes RGB)
          
-            fieldnames = 'X_Easting'+d+'Y_Northing'+d+'Z_Elevation'+d+'Intensity'+d+$
-               'ReturnNum'+d+'NumOfReturns'+d+'ScanDirFlag'+d+'EdgeFlightLine'+d+$
-               'Classification'+d+'ScanAngleRank'+d+'UserData'+d+'PointSourceID'+d+'Red'+d+'Green'+d+'Blue'
-               
-            IF headerRow EQ 1 THEN PRINTF,logASCII,fieldnames
+            if fTxt then begin
             
-            formatStr = '(F0, A, F0, A, F0, A, I0, A, I0, A, I0, A, I0, A, I0, A, I0, A, F0, A, I0, A, I0, A, I0, A, I0, A, I0)'
+              fieldnames = 'X_Easting'+d+'Y_Northing'+d+'Z_Elevation'+d+'Intensity'+d+$
+                 'ReturnNum'+d+'NumOfReturns'+d+'ScanDirFlag'+d+'EdgeFlightLine'+d+$
+                 'Classification'+d+'ScanAngleRank'+d+'UserData'+d+'PointSourceID'+d+'Red'+d+'Green'+d+'Blue'
+                 
+              IF headerRow EQ 1 THEN PRINTF,logASCII,fieldnames
+              
+              formatStr = '(F0, A, F0, A, F0, A, I0, A, I0, A, I0, A, I0, A, I0, A, I0, A, F0, A, I0, A, I0, A, I0, A, I0, A, I0)'
+            
+            endif
+            
+            if fShp then begin
+                        
+              mynewshape->AddAttribute, 'X_Easting', 5, 25, PRECISION=4
+              mynewshape->AddAttribute, 'Y_Northing', 5, 25, PRECISION=4
+              mynewshape->AddAttribute, 'Z_Elevation', 5, 25, PRECISION=4
+              mynewshape->AddAttribute, 'Intensity', 3, 4, PRECISION=0
+              mynewshape->AddAttribute, 'ReturnNum', 3, 2, PRECISION=0
+              mynewshape->AddAttribute, 'NumOfReturns', 3, 2, PRECISION=0
+              mynewshape->AddAttribute, 'ScanDirFlag', 3, 2, PRECISION=0
+              mynewshape->AddAttribute, 'EdgeFlightLine', 3, 2, PRECISION=0
+              mynewshape->AddAttribute, 'Classification', 3, 2, PRECISION=0
+              mynewshape->AddAttribute, 'ScanAngleRank', 5, 10, PRECISION=4
+              mynewshape->AddAttribute, 'UserData', 3, 10, PRECISION=0
+              mynewshape->AddAttribute, 'PointSourceID', 3, 10, PRECISION=0
+              mynewshape->AddAttribute, 'Red', 3, 2, PRECISION=0
+              mynewshape->AddAttribute, 'Green', 3, 2, PRECISION=0
+              mynewshape->AddAttribute, 'Blue', 3, 2, PRECISION=0
+  
+            endif
             
            for b=0L, nChunks -1  do begin
            
@@ -403,19 +870,10 @@ PRO LASToAscii_BCAL, event
         
                if b eq (nChunks-1) then tempSize = startsize + leftSize  - 1  $
                             else tempSize = startsize + chunkSize - 1
-                            
-               ; Initiate status report progress counter
-               ENVI_REPORT_STAT, statBase, i, n_elements(pData), cancel=cancel
-               IF cancel THEN BEGIN
-                  ENVI_REPORT_INIT, base=statBase, /finish
-                  FREE_LUN, logASCII
-                  pData      = 0B
-                  RETURN
-               ENDIF
                
                for i=startsize, tempsize  do begin
                
-                   printf, logASCII, $
+                   if fTxt then printf, logASCII, $
                       (pData[i].east * header.xScale + header.xOffset), d, $      ; X_Easting:  X * X scale factor + X offset
                       (pData[i].north * header.yScale + header.yOffset), d, $     ; Y_Northing:  Y * Y scale factor + Y offset
                       (pData[i].elev * header.zScale + header.zOffset), d, $      ; Z_Elevation:  Z * Z scale factor + Z offset
@@ -433,22 +891,112 @@ PRO LASToAscii_BCAL, event
                       pData[i].blue, $                                            ; Blue Band                     
                       Format=formatStr
                
+                  if fShp then begin
+                        
+                        ;Create structure for new entity
+                    
+                    entNew = {IDL_SHAPE_ENTITY}
+                    
+                    ; Define the values for the new entity
+              
+                    entNew.SHAPE_TYPE = 11
+                    entNew.ISHAPE = i
+                    entNew.BOUNDS[0] = pdata[i].east  * header.xScale + header.xOffset
+                    entNew.BOUNDS[1] = pdata[i].north  * header.yScale + header.yOffset
+                    entNew.BOUNDS[2] = pdata[i].elev  * header.zScale + header.zOffset
+                    entNew.BOUNDS[3] = 0.00000000
+                    entNew.BOUNDS[4] = pdata[i].east  * header.xScale + header.xOffset
+                    entNew.BOUNDS[5] = pdata[i].north  * header.yScale + header.yOffset
+                    entNew.BOUNDS[6] = pdata[i].elev  * header.zScale + header.zOffset
+                    entNew.BOUNDS[7] = 0.00000000
+                    
+                    entNew.N_VERTICES = 1 ; take out of example, need as workaround
+                    
+                    ;Create structure for new attributes
+                    
+                    attrNew = mynewshape ->GetAttributes(/ATTRIBUTE_STRUCTURE)
+                    
+                    ;Define the values for the new attributes
+          
+                    attrNew.ATTRIBUTE_0 = (pData[i].east * header.xScale + header.xOffset)
+                    attrNew.ATTRIBUTE_1 = (pData[i].north * header.yScale + header.yOffset)
+                    attrNew.ATTRIBUTE_2 = (pData[i].elev * header.zScale + header.zOffset)
+                    attrNew.ATTRIBUTE_3 = pData[i].inten
+                    attrNew.ATTRIBUTE_4 = (pData[i].nReturn MOD 8)
+                    attrNew.ATTRIBUTE_5 = (floor(pData[i].nReturn/8) MOD 8)
+                    attrNew.ATTRIBUTE_6 = (floor(pData[i].nReturn/64) MOD 2)
+                    attrNew.ATTRIBUTE_7 = (floor(pData[i].nReturn/128) MOD 2)
+                    attrNew.ATTRIBUTE_8 = pData[i].class
+                    attrNew.ATTRIBUTE_9 = pData[i].angle-(256*(floor(pData[i].angle/128) MOD 2))
+                    attrNew.ATTRIBUTE_10 = pData[i].user
+                    attrNew.ATTRIBUTE_11 = pData[i].source
+                    attrNew.ATTRIBUTE_12 = pData[i].red
+                    attrNew.ATTRIBUTE_13 = pData[i].green
+                    attrNew.ATTRIBUTE_14 = pData[i].blue
+                    
+                    ;Add the new entity to shapefile
+      
+                    mynewshape -> PutEntity, entNew
+                    
+                    ;Add the attributes to shapefile.
+    
+                    mynewshape -> SetAttributes, i, attrNew  
+                    
+                    ; Clean up the entity
+                    
+                    mynewshape->IDLffShape::DestroyEntity, entNew
+                 
+                 endif
                endfor
                
+                 ; Initiate status report progress counter... 
+               ENVI_REPORT_STAT, statBase, b, nchunks, cancel=cancel
+               IF cancel THEN BEGIN
+                  ENVI_REPORT_INIT, base=statBase, /finish
+                  if fTxt then FREE_LUN, logASCII
+                  if fShp then OBJ_DESTROY, mynewshape
+                  pData      = 0B
+                  RETURN
+               ENDIF
                
             ENDFOR
          END
          
-         6:  BEGIN   ;ALL FIELDS POINT FORMAT 1 (includes GPS_TIME)
+         7:  BEGIN   ;ALL FIELDS POINT FORMAT 1 (includes GPS_TIME)
          
-            fieldnames = 'X_Easting'+d+'Y_Northing'+d+'Z_Elevation'+d+'Intensity'+d+$
-               'ReturnNum'+d+'NumOfReturns'+d+'ScanDirFlag'+d+'EdgeFlightLine'+d+$
-               'Classification'+d+'ScanAngleRank'+d+'UserData'+d+'PointSourceID'+d+'GPS_TIME'+d+$
-               'Red'+d+'Green'+d+'Blue'
-               
-            IF headerRow EQ 1 THEN PRINTF,logASCII,fieldnames
+            if fTxt then begin
+              
+              fieldnames = 'X_Easting'+d+'Y_Northing'+d+'Z_Elevation'+d+'Intensity'+d+$
+                 'ReturnNum'+d+'NumOfReturns'+d+'ScanDirFlag'+d+'EdgeFlightLine'+d+$
+                 'Classification'+d+'ScanAngleRank'+d+'UserData'+d+'PointSourceID'+d+'GPS_TIME'+d+$
+                 'Red'+d+'Green'+d+'Blue'
+                 
+              IF headerRow EQ 1 THEN PRINTF,logASCII,fieldnames
+              
+              formatStr = '(F0, A, F0, A, F0, A, I0, A, I0, A, I0, A, I0, A, I0, A, I0, A, F0, A, I0, A, I0, A, F0, A, I0, A, I0, A, I0)'
             
-            formatStr = '(F0, A, F0, A, F0, A, I0, A, I0, A, I0, A, I0, A, I0, A, I0, A, F0, A, I0, A, I0, A, F0, A, I0, A, I0, A, I0)'
+            endif
+            
+            if fShp then begin
+                        
+              mynewshape->AddAttribute, 'X_Easting', 5, 25, PRECISION=4
+              mynewshape->AddAttribute, 'Y_Northing', 5, 25, PRECISION=4
+              mynewshape->AddAttribute, 'Z_Elevation', 5, 25, PRECISION=4
+              mynewshape->AddAttribute, 'Intensity', 3, 4, PRECISION=0
+              mynewshape->AddAttribute, 'ReturnNum', 3, 2, PRECISION=0
+              mynewshape->AddAttribute, 'NumOfReturns', 3, 2, PRECISION=0
+              mynewshape->AddAttribute, 'ScanDirFlag', 3, 2, PRECISION=0
+              mynewshape->AddAttribute, 'EdgeFlightLine', 3, 2, PRECISION=0
+              mynewshape->AddAttribute, 'Classification', 3, 2, PRECISION=0
+              mynewshape->AddAttribute, 'ScanAngleRank', 5, 10, PRECISION=4
+              mynewshape->AddAttribute, 'UserData', 3, 10, PRECISION=0
+              mynewshape->AddAttribute, 'PointSourceID', 3, 10, PRECISION=0
+              mynewshape->AddAttribute, 'GPS_TIME', 5, 12, PRECISION=4
+              mynewshape->AddAttribute, 'Red', 3, 2, PRECISION=0
+              mynewshape->AddAttribute, 'Green', 3, 2, PRECISION=0
+              mynewshape->AddAttribute, 'Blue', 3, 2, PRECISION=0
+  
+            endif
             
            for b=0L, nChunks -1  do begin
            
@@ -457,19 +1005,10 @@ PRO LASToAscii_BCAL, event
         
                if b eq (nChunks-1) then tempSize = startsize + leftSize  - 1  $
                             else tempSize = startsize + chunkSize - 1
-                            
-               ; Initiate status report progress counter
-               ENVI_REPORT_STAT, statBase, i, n_elements(pData), cancel=cancel
-               IF cancel THEN BEGIN
-                  ENVI_REPORT_INIT, base=statBase, /finish
-                  FREE_LUN, logASCII
-                  pData      = 0B
-                  RETURN
-               ENDIF
                
                for i=startsize, tempsize  do begin
                
-                   printf, logASCII, $
+                   if fTxt then printf, logASCII, $
                       (pData[i].east * header.xScale + header.xOffset), d, $      ; X_Easting:  X * X scale factor + X offset
                       (pData[i].north * header.yScale + header.yOffset), d, $     ; Y_Northing:  Y * Y scale factor + Y offset
                       (pData[i].elev * header.zScale + header.zOffset), d, $      ; Z_Elevation:  Z * Z scale factor + Z offset
@@ -487,9 +1026,77 @@ PRO LASToAscii_BCAL, event
                       pData[i].green,d, $                                            ; Green Band
                       pData[i].blue, $                                            ; Blue Band    
                       Format=formatStr
-               
+                   
+                   if fShp then begin
+                        
+                        ;Create structure for new entity
+                    
+                    entNew = {IDL_SHAPE_ENTITY}
+                    
+                    ; Define the values for the new entity
+              
+                    entNew.SHAPE_TYPE = 11
+                    entNew.ISHAPE = i
+                    entNew.BOUNDS[0] = pdata[i].east  * header.xScale + header.xOffset
+                    entNew.BOUNDS[1] = pdata[i].north  * header.yScale + header.yOffset
+                    entNew.BOUNDS[2] = pdata[i].elev  * header.zScale + header.zOffset
+                    entNew.BOUNDS[3] = 0.00000000
+                    entNew.BOUNDS[4] = pdata[i].east  * header.xScale + header.xOffset
+                    entNew.BOUNDS[5] = pdata[i].north  * header.yScale + header.yOffset
+                    entNew.BOUNDS[6] = pdata[i].elev  * header.zScale + header.zOffset
+                    entNew.BOUNDS[7] = 0.00000000
+                    
+                    entNew.N_VERTICES = 1 ; take out of example, need as workaround
+                    
+                    ;Create structure for new attributes
+                    
+                    attrNew = mynewshape ->GetAttributes(/ATTRIBUTE_STRUCTURE)
+                    
+                    ;Define the values for the new attributes
+          
+                    attrNew.ATTRIBUTE_0 = (pData[i].east * header.xScale + header.xOffset)
+                    attrNew.ATTRIBUTE_1 = (pData[i].north * header.yScale + header.yOffset)
+                    attrNew.ATTRIBUTE_2 = (pData[i].elev * header.zScale + header.zOffset)
+                    attrNew.ATTRIBUTE_3 = pData[i].inten
+                    attrNew.ATTRIBUTE_4 = (pData[i].nReturn MOD 8)
+                    attrNew.ATTRIBUTE_5 = (floor(pData[i].nReturn/8) MOD 8)
+                    attrNew.ATTRIBUTE_6 = (floor(pData[i].nReturn/64) MOD 2)
+                    attrNew.ATTRIBUTE_7 = (floor(pData[i].nReturn/128) MOD 2)
+                    attrNew.ATTRIBUTE_8 = pData[i].class
+                    attrNew.ATTRIBUTE_9 = pData[i].angle-(256*(floor(pData[i].angle/128) MOD 2))
+                    attrNew.ATTRIBUTE_10 = pData[i].user
+                    attrNew.ATTRIBUTE_11 = pData[i].source
+                    attrNew.ATTRIBUTE_12 = pData[i].time
+                    attrNew.ATTRIBUTE_13= pData[i].red
+                    attrNew.ATTRIBUTE_14 = pData[i].green
+                    attrNew.ATTRIBUTE_15 = pData[i].blue
+                    
+                    ;Add the new entity to shapefile
+      
+                    mynewshape -> PutEntity, entNew
+                    
+                    ;Add the attributes to shapefile.
+    
+                    mynewshape -> SetAttributes, i, attrNew  
+                    
+                    ; Clean up the entity
+                    
+                    mynewshape->IDLffShape::DestroyEntity, entNew
+                 
+                 endif
+                 
+                 
                endfor
                
+                ; Initiate status report progress counter... 
+               ENVI_REPORT_STAT, statBase, b, nchunks, cancel=cancel
+               IF cancel THEN BEGIN
+                  ENVI_REPORT_INIT, base=statBase, /finish
+                  if fTxt then FREE_LUN, logASCII
+                  if fShp then OBJ_DESTROY, mynewshape
+                  pData      = 0B
+                  RETURN
+               ENDIF
                
             ENDFOR
          END
@@ -500,7 +1107,8 @@ PRO LASToAscii_BCAL, event
       ENVI_REPORT_INIT, base=statBase, /finish
       
       ; Close the output ascii text file
-      FREE_LUN, logASCII
+      if fTxt then FREE_LUN, logASCII
+      if fShp then OBJ_DESTROY, mynewshape
       
       ; Clear up some memory
       pData      = 0B
