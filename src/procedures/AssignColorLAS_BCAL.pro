@@ -167,6 +167,13 @@ for a=0,nFiles-1 do begin
     outputFile = outputDir + '\' + file_basename(inputFiles[a])
    
     WriteLAS_BCAL, outputFile, header, data, records=records, /check
+    
+           ; Clear up some memory
+
+    data      = 0B
+    pData     = 0B
+    xImage    = 0B
+    yImage    = 0B
 
 endfor
 
