@@ -162,6 +162,7 @@ products = {hmin    :{title:'Height: Minimum', points:1, index:-1, doIt:0}, $
             vegnElev   :{title:'Number of LiDAR vegetation returns', points:1, index:-1, doIt:0}, $
             gndnElev   :{title:'Number of LiDAR ground returns', points:1, index:-1, doIt:0}, $
             vdensity    :{title:'Total vegetation density', points:1, index:-1, doIt:0}, $
+            vcover    :{title:'Vegetation cover', points:1, index:-1, doIt:0}, $
             stratum0   :{title:'Percentage of ground returns', points:1, index:-1, doIt:0}, $
             stratum1   :{title:'Percent of vegetation in height range > 0 and <= 1 meters', points:1, index:-1, doIt:0}, $
             stratum2   :{title:'Percent of vegetation in height range > 1 <= 2.5 meters', points:1, index:-1, doIt:0}, $
@@ -596,7 +597,7 @@ for b=0,nFiles-1 do begin
                         if products.hp95th.doIt then $
                             dataArray[i,k,products.hp95th.index]  = height[sortht[95*nht / 100]]  
                        
-                        crownrt = where(height gt crnt, crwncount, ncomplement=grndcount)
+                        crownrt = where(height gt crnt, crwncount)
                         grndrt = where(height le grnt, grndcount)
                         abv0rt = where(height gt 0, abov0ct)
                         atex= where(height gt grnt and height le crnt, ntex)
@@ -609,6 +610,8 @@ for b=0,nFiles-1 do begin
                             dataArray[i,k,products.gndnElev.index]  = grndcount 
                         if products.vdensity.doIt then $ 
                             dataArray[i,k,products.vdensity.index]  =  (float(crwncount)/float(nht)) * 100D
+                        if products.vcover.doIt then $ 
+                            dataArray[i,k,products.vcover.index]  =  (float(crwncount)/float(n_elements(index))) * 100D
                         if products.stratum0.doIt then $
                             dataArray[i,k,products.stratum0.index]  = (float(grndcount)/float(nht)) * 100D
                         if products.stratum1.doIt then $
