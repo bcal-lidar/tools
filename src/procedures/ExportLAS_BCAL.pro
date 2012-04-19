@@ -101,7 +101,7 @@ endfor
 
 widget_control, event.id, get_uvalue=exportType
 
-topBase = widget_auto_base(title='Export lidar data by return number')
+topBase = widget_auto_base(title='Export lidar data')
 
 dummy   = widget_outf(topBase, /directory, prompt='Select output directory', uvalue='outF', /auto)
  

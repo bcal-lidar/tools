@@ -609,9 +609,9 @@ for b=0,nFiles-1 do begin
                         if products.gndnElev.doIt then $ 
                             dataArray[i,k,products.gndnElev.index]  = grndcount 
                         if products.vdensity.doIt then $ 
-                            dataArray[i,k,products.vdensity.index]  =  (float(crwncount)/float(nht)) * 100D
+                            dataArray[i,k,products.vdensity.index]  =  (float(crwncount)/float(grndcount)) * 100D
                         if products.vcover.doIt then $ 
-                            dataArray[i,k,products.vcover.index]  =  (float(crwncount)/float(n_elements(index))) * 100D
+                            dataArray[i,k,products.vcover.index]  =  (float(crwncount)/float(nht)) * 100D
                         if products.stratum0.doIt then $
                             dataArray[i,k,products.stratum0.index]  = (float(grndcount)/float(nht)) * 100D
                         if products.stratum1.doIt then $

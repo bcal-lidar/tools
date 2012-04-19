@@ -292,7 +292,7 @@ header.pointFormat  = pointFormat
 
 header.xScale = scale
 header.yScale = scale
-header.zScale = 0.01D
+header.zScale = 1d-5
 
 header.xOffset = 0D
 header.yOffset = 0D
