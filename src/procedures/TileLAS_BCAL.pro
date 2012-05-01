@@ -73,15 +73,15 @@ pro TileLAS_BCAL, event
 
 compile_opt idl2, logical_predicate
 
-;    ; Establish error handler.
-;
-;catch, theError
-;if theError ne 0 then begin
-;    catch, /cancel
-;    help, /last_message, output=errText
-;    errMsg = dialog_message(errText, /error, title='Error processing request')
-;    return
-;endif
+    ; Establish error handler.
+
+catch, theError
+if theError ne 0 then begin
+    catch, /cancel
+    help, /last_message, output=errText
+    errMsg = dialog_message(errText, /error, title='Error processing request')
+    return
+endif
 
     ; Open input files
 

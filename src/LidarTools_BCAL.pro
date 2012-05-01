@@ -117,6 +117,9 @@ envi_define_menu_button, buttonInfo, value='Buffer LAS Files', event_pro='Buffer
 envi_define_menu_button, buttonInfo, value='Tile LAS File(s)', event_pro='TileLAS_BCAL', $
     position= 9, ref_value='LAS File', uvalue='tile', separator=-1
     
+envi_define_menu_button, buttonInfo, value='Reclassify LAS File(s)', event_pro='ReclassifyLAS_BCAL', $
+    position= 9, ref_value='LAS File', uvalue='reclass', separator=-1
+    
 
     ; LAS Decimate/Subset
     

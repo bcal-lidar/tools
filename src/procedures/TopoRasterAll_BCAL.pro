@@ -146,7 +146,8 @@ products = {allMin   :{title:'Elevation - Minimum',      points:1, index:-1, doI
             allTrasp  :{title:'Topographic Solar-Radiation Index (TRASP)', points:3, index:-1, doIt:0}, $
             allSlpCosAsp  :{title:'Slope Cosine Aspect (SlpCosAsp)',    points:3, index:-1, doIt:0}, $
             allSlpSinAsp  :{title:'Slope Sine Aspect (SlpSinAsp)',      points:3, index:-1, doIt:0}, $
-            allDen    :{title:'Point Density',               points:1, index:-1, doIt:0}}
+            allDen    :{title:'Point Density',               points:1, index:-1, doIt:0}, $
+            allLastRet :{title:'Percent Last Return',       points:1, index:-1, doIt:0}}
 
 nProducts    = n_tags(products)
 productList  = strarr(nProducts)

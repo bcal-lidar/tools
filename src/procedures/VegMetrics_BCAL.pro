@@ -154,7 +154,7 @@ products = {hmin    :{title:'Height: Minimum', points:1, index:-1, doIt:0}, $
             hp5th   :{title:'Height: 5th Percentile', points:1, index:-1, doIt:0}, $
             hp10th  :{title:'Height: 10th Percentile', points:1, index:-1, doIt:0}, $
             hp25th  :{title:'Height: 25th Percentile', points:1, index:-1, doIt:0}, $
-            hmedian :{title:'Height: 50th Percentile', points:2, index:-1, doIt:0}, $
+            hmedian :{title:'Height: 50th Percentile (Median)', points:2, index:-1, doIt:0}, $
             hp75th  :{title:'Height: 75th Percentile', points:1, index:-1, doIt:0}, $
             hp90th  :{title:'Height: 90th Percentile', points:1, index:-1, doIt:0}, $
             hp95th  :{title:'Height: 95th Percentile', points:1, index:-1, doIt:0}, $
