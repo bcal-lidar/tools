@@ -92,7 +92,7 @@ classIndex = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 readBase = widget_auto_base(title='Reclassify LAS files')
 
     tileBase = widget_base(readBase, /row)
-    dummy    = widget_edit(tileBase, dt=2, floor=1, list=list, $
+    dummy    = widget_edit(tileBase, dt=2, list=list, $
                            prompt='Reclassification:', vals=classIndex, ysize=13, uvalue='newIndex', /auto)
 
     outputBase  = widget_base(readBase, /row)
