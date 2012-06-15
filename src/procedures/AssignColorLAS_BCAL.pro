@@ -159,7 +159,7 @@ for a=0,nFiles-1 do begin
     data.north = pData.north
     data.nreturn = pData.nreturn
     data.source = pData.source
-    data.time = pData.time
+    if header.pointFormat eq 3 then data.time = pData.time
     data.user = pData.user
         
            ; Write the new file

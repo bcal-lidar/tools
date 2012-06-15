@@ -552,7 +552,7 @@ for b=0,nFiles-1 do begin
                         ; If at least one data point is found, determine the pixel values for the
                         ; various products.
                   
-                        height = pData[index].source * header.zScale + header.zOffset
+                        height = pData[index].source * header.zScale; + header.zOffset
                         minht= min(height, max=maxht)
                         momht= moment(height, mdev=aadht, sdev=stdht)
                 

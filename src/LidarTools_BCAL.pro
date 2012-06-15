@@ -209,7 +209,7 @@ envi_define_menu_button, buttonInfo, value='Create Raster Products', /menu, ref_
         position=4, ref_value='Create Raster Products', UVALUE='imetric', separator=-1
     
     envi_define_menu_button, buttonInfo, VALUE='Prepare LAS file(s)', event_pro = 'PrepareLAS_BCAL', $
-        position=5, ref_value='Create Raster Products', UVALUE='imetric'
+        position=5, ref_value='Create Raster Products', UVALUE='prepareLAS'
 
 envi_define_menu_button, buttonInfo, value='Create Raster Layer (legacy)', event_pro='LidarRasterLAS_BCAL', $
     position=6, separator=-1, ref_value='BCAL LiDAR', uvalue='raster_legacy'
