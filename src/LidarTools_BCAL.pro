@@ -222,6 +222,9 @@ envi_define_menu_button, buttonInfo, value='Create Elevation Profile(s)', event_
     
 envi_define_menu_button, buttonInfo, value='3D Lidar Viewer', event_pro='Visualize3D_BCAL', $
     position=12, ref_value='BCAL LiDAR', separator=-1, uvalue='visualize'
+    
+envi_define_menu_button, buttonInfo, value='LiDAR Processing Wizard', event_pro='Wizard_BCAL', $
+    position=12, ref_value='BCAL LiDAR', separator=-1, uvalue='wizard'
        
     ; Help Menu
     
