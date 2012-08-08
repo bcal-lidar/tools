@@ -16,8 +16,8 @@ function Wizard_Generate_Data, parent, UVALUE=uvalue, UNAME=uname, TAB_MODE=tab_
     /ALIGN_CENTER)
   
   descriptionLabel = WIDGET_LABEL(genDataBase, value= $
-      'Before we can generate datasets from the LiDAR data,  ' + String(13b) $
-    + 'our dataset must be height filtered. If this is a new dataset,' + String(13b) $
+      'Before value-added products are generated from the LiDAR data,  ' + String(13b) $
+    + 'the dataset must be height filtered. If this is a new dataset,' + String(13b) $
     + 'use the Perform Height Filtering tool. If the data is height filtered' + String(13b) $
     + 'with a non-BCAL toolset, use the Prepare LAS tool. Otherwise, you can' + String(13b) $
     + 'skip this step and continue on to the Generate Raster Tool.' + String(13b) $
