@@ -156,7 +156,7 @@ fieldList = [fieldList,'  n/a  ']
 readBase = widget_auto_base(title='Data Selection')
 
     dummy     = widget_label(readBase, value='Sample Data:')
-    dummy     = widget_text(readBase, /scroll, value=dataSamp, ysize=6)
+    dummy     = widget_text(readBase, /scroll, value=dataSamp, ysize=4)
 
     headBase  = widget_base(readBase, /row)
     dummy     = widget_param(headBase, default=1, dt=2, floor=0, prompt='Enter number of lines in the file header: ', $
@@ -165,66 +165,71 @@ readBase = widget_auto_base(title='Data Selection')
     paramBase = widget_base(readBase, /row)
     leftBase  = widget_base(paramBase, /column)
     eastBase  = widget_base(leftBase, /row, /align_right)
-    dummy     = widget_pmenu(eastBase, list=fieldList[0:nFields-1],  default=0, prompt='Select easting field:', $
+    dummy     = widget_pmenu(eastBase, list=fieldList[0:nFields-1],  default=0, prompt='Select easting:', $
                              uvalue='fEast', /auto)
     northBase = widget_base(leftBase, /row, /align_right)
-    dummy     = widget_pmenu(northBase, list=fieldList[0:nFields-1], default=1, prompt='Select northing field:', $
+    dummy     = widget_pmenu(northBase, list=fieldList[0:nFields-1], default=1, prompt='Select northing:', $
                              uvalue='fNorth', /auto)
     elevBase  = widget_base(leftBase, /row, /align_right)
-    dummy     = widget_pmenu(elevBase, list=fieldList[0:nFields-1],  default=2, prompt='Select elevation field:', $
+    dummy     = widget_pmenu(elevBase, list=fieldList[0:nFields-1],  default=2, prompt='Select elevation:', $
                              uvalue='fElev', /auto)
     intenBase = widget_base(leftBase, /row, /align_right)
-    dummy     = widget_pmenu(intenBase, list=fieldList, default=nFields, prompt='Select intensity field:', $
+    dummy     = widget_pmenu(intenBase, list=fieldList, default=nFields, prompt='Select intensity:', $
                              uvalue='fInten', /auto)
     retBase   = widget_base(leftBase, /row, /align_right)
-    dummy     = widget_pmenu(retBase, list=fieldList,   default=nFields, prompt='Select return number field:', $
-                             uvalue='fReturn', /auto)
-;    nretBase   = widget_base(leftBase, /row, /align_right)
-;    dummy     = widget_pmenu(nretBase, list=fieldList,   default=nFields, prompt='Select number of returns field:', $
-;                             uvalue='fnReturn', /auto)                           
-    classBase = widget_base(leftBase, /row, /align_right)
-    dummy     = widget_pmenu(classBase, list=fieldList, default=nFields, prompt='Select classfication field:', $
-                             uvalue='fClass', /auto)
-    timeBase  = widget_base(leftBase, /row, /align_right)
-    dummy     = widget_pmenu(timeBase, list=fieldList,  default=nFields, prompt='Select GPS time field:', $
-                             uvalue='fTime', /auto)
+    dummy     = widget_pmenu(retBase, list=fieldList,   default=nFields, prompt='Select return number:', $
+                             uvalue='fReturn', /auto)  
+
                              
-    rightBase = widget_base(paramBase, /column)
+    rightBase = widget_base(paramBase, /column)                                                 
+    classBase = widget_base(rightBase, /row, /align_right)
+    dummy     = widget_pmenu(classBase, list=fieldList, default=nFields, prompt='Select classfication:', $
+                             uvalue='fClass', /auto)
+    timeBase  = widget_base(rightBase, /row, /align_right)
+    dummy     = widget_pmenu(timeBase, list=fieldList,  default=nFields, prompt='Select GPS time:', $
+                             uvalue='fTime', /auto)
     angleBase = widget_base(rightBase, /row, /align_right)
-    dummy     = widget_pmenu(angleBase, list=fieldList, default=nFields, prompt='Select scan angle field:', $
+    dummy     = widget_pmenu(angleBase, list=fieldList, default=nFields, prompt='Select scan angle:', $
                              uvalue='fAngle', /auto)
-;    sdirBase = widget_base(rightBase, /row, /align_right)
-;    dummy     = widget_pmenu(sdirBase, list=fieldList, default=nFields, prompt='Select scan direction field:', $
-;                             uvalue='fScanDir', /auto)
-;    lineBase  = widget_base(rightBase, /row, /align_right)
-;    dummy     = widget_pmenu(lineBase, list=fieldList,  default=nFields, prompt='Select edge of flight line field:', $
-;                             uvalue='fLine', /auto)
     userdBase = widget_base(rightBase, /row, /align_right)
-    dummy     = widget_pmenu(userdBase, list=fieldList, default=nFields, prompt='Select user data field:', $
+    dummy     = widget_pmenu(userdBase, list=fieldList, default=nFields, prompt='Select user data:', $
                              uvalue='fuserData', /auto)
     ptsrcBase = widget_base(rightBase, /row, /align_right)
-    dummy     = widget_pmenu(ptsrcBase, list=fieldList, default=nFields, prompt='Select point source ID field:', $
+    dummy     = widget_pmenu(ptsrcBase, list=fieldList, default=nFields, prompt='Select point source ID:', $
                              uvalue='fptsrc', /auto)
-    redBase = widget_base(rightBase, /row, /align_right)
-    dummy     = widget_pmenu(redBase, list=fieldList, default=nFields, prompt='Select red image channel field:', $
-                             uvalue='fred', /auto)
-    greenBase = widget_base(rightBase, /row, /align_right)
-    dummy     = widget_pmenu(greenBase, list=fieldList, default=nFields, prompt='Select green image channel field:', $
-                             uvalue='fgreen', /auto)
-    blueBase = widget_base(rightBase, /row, /align_right)
-    dummy     = widget_pmenu(blueBase, list=fieldList, default=nFields, prompt='Select blue image channel field:', $
-                             uvalue='fblue', /auto)
+
                              
-    outBase   = widget_base(readBase, /row)
-    fileBase  = widget_base(outBase, /column)
-    dummy     = widget_outf(fileBase, prompt='Select the output directory ', /directory, $
+    right2Base = widget_base(paramBase, /column)
+    redBase = widget_base(right2Base, /row, /align_right)
+    dummy     = widget_pmenu(redBase, list=fieldList, default=nFields, prompt='Select red channel:', $
+                             uvalue='fred', /auto)
+    greenBase = widget_base(right2Base, /row, /align_right)
+    dummy     = widget_pmenu(greenBase, list=fieldList, default=nFields, prompt='Select green channel:', $
+                             uvalue='fgreen', /auto)
+    blueBase = widget_base(right2Base, /row, /align_right)
+    dummy     = widget_pmenu(blueBase, list=fieldList, default=nFields, prompt='Select blue channel:', $
+                             uvalue='fblue', /auto)
+    
+    
+    paramBase2 = widget_base(readBase, /row)   
+    leftBase2  = widget_base(paramBase2, /column)
+                          
+    scaleBase = widget_base(leftBase2, /row)
+    dummy    = widget_edit(scaleBase, list=['X Scale:','Y Scale:','Z Scale:'], dt=5, field=8,ysize=4, $
+                           prompt='Scale:', vals=[0.01D, 0.01D, 0.01D], uvalue='fScale', /frame, /auto)
+    dummy     = widget_outf(leftBase2, prompt='Select the output directory ', /directory, $
                             uvalue='lasName', /auto)
-
-    verBase   = widget_base(readBase, /row)
-    dummy     = widget_pmenu(verBase, list=['Version 1.0','Version 1.1','Version 1.2'], default=2, prompt='Select LAS format:', $
+    lasvBase  = widget_base(leftBase2, /row)
+    dummy     = widget_pmenu(lasvBase, list=['Version 1.0','Version 1.1','Version 1.2'], default=2, prompt='Select LAS format:', $
                              uvalue='format', /auto)
+    
+    rightBase2 = widget_base(paramBase2, /column)
+    
+    offBase = widget_base(rightBase2, /row)
+    dummy    = widget_edit(offBase, list=['X Offset:','Y Offset:','Z Offset:'],  dt=5, field=8, ysize=4, $
+                           prompt='Offsets:', vals=[0D, 0D, 0D], uvalue='fOffset', /frame, /auto)
+    dummy     = widget_map(rightBase2, default_map=[0,0], uvalue='proj', /auto_manage)
 
-    dummy     = widget_map(readBase, default_map=[0,0], uvalue='proj', /auto_manage)
 
 result = auto_wid_mng(readBase)
 if (result.accept eq 0) then return
@@ -237,10 +242,6 @@ fInten  = result.fInten
 fClass  = result.fClass
 fTime   = result.fTime
 fReturn = result.fReturn
-;fnReturn = result.fnReturn
-;fAngle  = result.fAngle
-;fScanDir  = result.fScanDir
-;fLine   = result.fLine
 fuserdata   = result.fuserdata
 fptsrc   = result.fptsrc
 fred   = result.fred
@@ -260,25 +261,6 @@ if (fTime ne nFields) and (fred ne nFields) then pointFormat = 3
 
 records = RecordsToProj_BCAL(proj, /reverse)
 
-    ; Set the scale based on the projection
-
-case proj.units of
-
-    envi_translate_projection_units('Meters')           : scale = 1d-2
-    envi_translate_projection_units('Km')               : scale = 1d-5
-
-    envi_translate_projection_units('Feet')             : scale = 1d-2
-    envi_translate_projection_units('Yards')            : scale = 1d-2
-    envi_translate_projection_units('Miles')            : scale = 1d-6
-    envi_translate_projection_units('Nautical Miles')   : scale = 1d-6
-
-    envi_translate_projection_units('Degrees')          : scale = 1d-7
-    envi_translate_projection_units('Minutes')          : scale = 1d-6
-    envi_translate_projection_units('Seconds')          : scale = 1d-4
-    envi_translate_projection_units('Radians')          : scale = 1d-9
-
-endcase
-
     ; Create header structure, variable records, and data structure
 
 header = InitHeaderLAS_BCAL()
@@ -290,13 +272,13 @@ header.pointFormat  = pointFormat
 
     ; Set scaling and offsets
 
-header.xScale = scale
-header.yScale = scale
-header.zScale = 1d-5
+header.xScale = result.fscale[0]
+header.yScale = result.fscale[1]
+header.zScale = result.fscale[2]
 
-header.xOffset = 0D
-header.yOffset = 0D
-header.zOffset = 0D
+header.xOffset = result.foffset[0]
+header.yOffset = result.foffset[1]
+header.zOffset = result.foffset[2]
 
     ; Set the chunking size
 
@@ -365,9 +347,6 @@ for a=0,nFiles-1 do begin
 
             if fInten ne nFields then data.inten = dataTemp[fInten]
             if fTime  ne nFields then data.time  = dataTemp[fTime]
-;            if fnReturn ne nFields then data.nReturn = dataTemp[fAngle]
-;            if fAngle ne nFields then data.angle = dataTemp[fAngle]
-;            if fLine  ne nFields then data.user  = dataTemp[fLine]
             if fClass ne nFields then data.class  = dataTemp[fClass]
             if fuserdata ne nFields then data.user  = dataTemp[fuserdata]
             if fred   ne nFields then data.red  = dataTemp[fred]
