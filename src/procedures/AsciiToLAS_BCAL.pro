@@ -341,9 +341,9 @@ for a=0,nFiles-1 do begin
             readf, inputLun, dataTemp
             dataTemp = strsplit(dataTemp, ' ,;', /extract)
 
-            data.east  = dataTemp[fEast]  / header.xScale - header.xOffset
-            data.north = dataTemp[fNorth] / header.yScale - header.yOffset
-            data.elev  = dataTemp[fElev]  / header.zScale - header.zOffset
+            data.east  = (dataTemp[fEast] - header.xOffset) / header.xScale 
+            data.north = (dataTemp[fNorth] - header.yOffset) / header.yScale 
+            data.elev  = (dataTemp[fElev] - header.zOffset) / header.zScale
 
             if fInten ne nFields then data.inten = dataTemp[fInten]
             if fTime  ne nFields then data.time  = dataTemp[fTime]
@@ -353,7 +353,6 @@ for a=0,nFiles-1 do begin
             if fgreen ne nFields then data.green  = dataTemp[fgreen]
             if fblue  ne nFields then data.blue  = dataTemp[fblue]
          
-
             if fReturn ne nFields then begin
                 data.nReturn = dataTemp[fReturn]
                 if fReturn and fReturn le 5 then header.nReturns[dataTemp[fReturn]-1]++
