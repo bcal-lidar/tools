@@ -1,60 +1,73 @@
+;+
+; This function is to act as the data input tool. We will try to perform some operations automatically and save
+; files automatically along the way.  
+
+
+
 PRO WIZARD_DATA_INPUT_EV, ev
+  
+  ;This grabs the local stashed variable
+  base = ev.handler
+  stash = WIDGET_INFO(base, /CHILD)
+  WIDGET_CONTROL, stash, GET_UVALUE=fileLoadStash, /NO_COPY 
+ 
   ;get the button pressed
   WIDGET_CONTROL, ev.ID, GET_UVALUE=command
-  CASE command OF
-    'ASCIITool': AsciiToLAS_BCAL, ev
-    'TileTool': TileLAS_BCAL, ev
-    'DataInfo': Visualize3D_BCAL, ev
-    'HeaderTool': FileInfoLAS_BCAL, ev
-    'BoundaryTool': BoundLAS_BCAL, ev
-    'BufferTool': BufferLAS_BCAL, ev
+  CASE command OF    
+    'FileBrowse': BEGIN
+        ;get the file
+        inputFile = GetFiles()        
+        WIDGET_CONTROL, fileLoadStash.fileLoadName, SET_VALUE=inputFile     
+        
+        ;now we want to try and make the top level next button visible
+        WIDGET_CONTROL, ev.TOP, GET_UVALUE=MainStash
+        Widget_Control, MainStash.nextBtn, Sensitive=1
+        
+      END
   ENDCASE
+  WIDGET_CONTROL, stash, SET_UVALUE=fileLoadStash, /NO_COPY
   
 END
 
+function GetFileName, id
+ 
+  stash = WIDGET_INFO(id, /CHILD)
+  WIDGET_CONTROL, stash, GET_UVALUE=fileLoadStash, /NO_COPY
+  WIDGET_CONTROL, fileLoadStash.fileLoadName, GET_VALUE=fileName
+  
+  WIDGET_CONTROL, stash, SET_UVALUE=fileLoadStash, /NO_COPY
+  return, fileName
+end
+
 function Wizard_Data_Input, parent, UVALUE=uvalue, UNAME=uname, TAB_MODE=tab_mode, XSIZE=width
   
-  dataInputBase = WIDGET_BASE(parent, UVALUE=uvalue, /COLUMN, Map=0, /BASE_ALIGN_LEFT, XSIZE=width, SPACE=20)
+  dataInputBase = WIDGET_BASE(parent, UVALUE=uvalue, /COLUMN, Map=0, /BASE_ALIGN_LEFT, $
+  XSIZE=width, SPACE=20, EVENT_PRO='WIZARD_DATA_INPUT_EV', FUNC_GET_VALUE='GetFileName')
+  
   titleText = WIDGET_LABEL(dataInputBase, value='Data Preprocessing', FONT='Arial*BOLD*UNDERLINE', $
     /ALIGN_CENTER)
   
+
   descriptionLabel = WIDGET_LABEL(dataInputBase, value= $
-      'First we will inspect and preprocess the data. ' + String(13b) $
-    + '1. If your data is in ASCII format, first convert it to LAS. ' + String(13b) $
-    + '2. Verify data by using the info, header, and boundary tools below. ' + String(13b) $
-    + '3. If your LAS dataset is rather large (>200MB) consider tiling it.' + String(13b) $
-    + '4. If your dataset consists of multiple LAS files, use the Buffer tool.' + String(13b) $
-    ,/ALIGN_LEFT,YSIZE=135, FONT='Arial*16')  
-    
-  conversionLabel = WIDGET_LABEL(dataInputBase, value='Data Conversion', FONT='Arial*BOLD*UNDERLINE*18', $
-    XSIZE=width, /ALIGN_CENTER)
-    
-  conversionBase = WIDGET_BASE(dataInputBase, /COLUMN, /ALIGN_CENTER)
-  convertBtn = WIDGET_BUTTON(conversionBase, VALUE='Convert ASCII to LAS Tool', UVALUE='ASCIITool', XSIZE=150)
+    'Please start by uploading a LiDAR dataset either in ' +  String(13b) $
+    + '.las or another text format (ASCII).', /ALIGN_LEFT, YSIZE=135, FONT='Arial*16')
   
-  optionalLabel = WIDGET_LABEL(dataInputBase, value='Optional Preprocessing', FONT='Arial*BOLD*UNDERLINE*18', $
-    XSIZE=width, /ALIGN_CENTER)
-  
-  ;base for the three data inspection tools
-  optionalBase = WIDGET_BASE(dataInputBase, /ROW, XSIZE=width)
-  dataInfoBtn = WIDGET_BUTTON(optionalBase, VALUE='Visualize LAS Data', UVALUE='DataInfo', XSIZE=150)
-  headerBtn = WIDGET_BUTTON(optionalBase, VALUE='View LAS Header', UVALUE='HeaderTool', XSIZE=150)
-  boundaryBtn = WIDGET_BUTTON(optionalBase, VALUE='Create Vector Boundary', UVALUE='BoundaryTool', XSIZE=150)  
-  
-  ;tile and buffer options
-  tbLabel = WIDGET_LABEL(dataInputBase, value='Tile/Buffer Data', FONT='Arial*BOLD*UNDERLINE*18', $
-    XSIZE=width, /ALIGN_CENTER)
-  
-  
-  tbBase = WIDGET_BASE(dataInputBase, /COLUMN, /ALIGN_CENTER)
-  tbBtnGroup = WIDGET_BASE(tbBase, /ROW, /ALIGN_CENTER)
-  tileBtn = WIDGET_BUTTON(tbBtnGroup, VALUE='Tile LAS Data', UVALUE='TileTool', XSIZE=150, YOFFSET=25)
-  bufferBtn = WIDGET_BUTTON(tbBtnGroup, VALUE='Buffer LAS Dataset', UVALUE='BufferTool', XSIZE=150, YOFFSET=25)
-  
-  ;Height Filtering Group
-  
-  
-  ;have to specify the event-handler manually when inside a function apparently
-  XMANAGER, 'Wizard_Data_Input', dataInputBase, EVENT_HANDLER='WIZARD_DATA_INPUT_EV'
+  ;base widget for the file upload line
+  fileLoadRowBase = WIDGET_BASE(dataInputBase, /ROW, /ALIGN_CENTER, XSIZE=width)
+  fileLoadLabel = WIDGET_LABEL(fileLoadRowBase, UVALUE='fileLoadLabel', value='Input Dataset: ', /ALIGN_LEFT, FONT='Arial*14')
+  fileLoadName = WIDGET_TEXT(fileLoadRowBase, XSIZE=30, XOFFSET=10, /EDITABLE)
+  fileLoadBtn = WIDGET_BUTTON(fileLoadRowBase, XSIZE=50, VALUE='Browse...', UVALUE='FileBrowse')
+   
+   
+  fileLoadStash = {fileLoadName:fileLoadName}
+  WIDGET_CONTROL, WIDGET_INFO(dataInputBase, /CHILD), SET_UVALUE=fileLoadStash, /NO_COPY
+ 
   return, dataInputBase
 END
+
+;function to get the file from the user and perform analysis
+function GetFiles 
+  inputFile = ENVI_PICKFILE(TITLE='Select Input LiDAR Dataset', FILTER='*.las') 
+  
+  return, inputFile[0]
+end
