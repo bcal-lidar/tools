@@ -244,6 +244,12 @@ for a=0,nFiles-1 do begin
                          + (0 > floor((x - xMin) / xDiv) < (xNum - 1))
 
         tileHist = histogram(tileCoord, min=0, max=nTiles-1, reverse_indices=index)
+        
+        ; This is necessary if input files have different scale and offsets
+        
+        data.east  = (x - outputheader.xoffset) / outputheader.xScale
+        data.north = (y - outputheader.yoffset) / outputheader.yScale
+        data.elev  = (z - outputheader.zoffset) / outputheader.zScale
 
         for c=0,nTiles-1 do begin
 
