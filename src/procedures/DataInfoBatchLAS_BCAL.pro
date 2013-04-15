@@ -143,7 +143,11 @@ headings = 'FileName'+d+ $
            'Mean_VegHeight'+d+$
            'StDev_VegHeight'+d+$
            'Skew_VegHeight'+d+$
-           'Kurt_VegHeight'
+           'Kurt_VegHeight'+d+$
+           'Min_UserData'+d+$
+           'Max_UserData'+d+$
+           'Mean_UserData'+d+$
+           'StDev_UserData'
 
 PRINTF,txtLun,headings
 
@@ -176,9 +180,12 @@ for a=0,nFiles-1 do begin
       mominten= moment(pData.inten, sdev=sdevinten)
       
       ;scan angle statistics
-      
       minangle= min(pData.angle-128B, max=maxangle)
       momangle= moment((pData.angle-128B), sdev=sdevangle)
+      
+      ;User data statistics
+      minuser= min(pData.user, max=maxuser)
+      momuser= moment(pData.user, sdev=sdevuser)
       
       ;vegetation height statistics
       vegindex=where(pData.class eq 3, vegcount)
@@ -245,7 +252,11 @@ for a=0,nFiles-1 do begin
                       strcompress(momveg[0]), d, $
                       strcompress(sdevveg), d, $
                       strcompress(momveg[2]), d, $
-                      strcompress(momveg[3])
+                      strcompress(momveg[3]), d, $
+                      strcompress(minuser), d, $
+                      strcompress(maxuser), d, $
+                      strcompress(momuser[0]), d, $
+                      strcompress(sdevuser)
         
         
         envi_report_stat, statBase, a, nFiles, cancel=cancel
