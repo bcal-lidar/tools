@@ -239,11 +239,11 @@ grnt      = result.grnt
 crnt      = result.crnt
 
 ;break values for stratified density
-s1=1 / header.zScale ;<= s1  
-s2=2.5  / header.zScale  ;> s1 and <= s2
-s3=10  / header.zScale   ;> s2 and <= s3  
-s4=20  / header.zScale   ;> s3 and <= s4 
-s5=30  / header.zScale   ;>= s5 
+s1 = 1.  * header.zScale ;<= s1  
+s2 = 2.5 * header.zScale  ;> s1 and <= s2
+s3 = 10. * header.zScale   ;> s2 and <= s3  
+s4 = 20. * header.zScale   ;> s3 and <= s4 
+s5 = 30. * header.zScale   ;>= s5 
 
 if nFiles eq 1 then doMosaic = 1
 
