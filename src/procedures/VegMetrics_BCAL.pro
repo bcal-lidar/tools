@@ -239,11 +239,11 @@ grnt      = result.grnt
 crnt      = result.crnt
 
 ;break values for stratified density
-s1 = 1.  * header.zScale ;<= s1  
-s2 = 2.5 * header.zScale  ;> s1 and <= s2
-s3 = 10. * header.zScale   ;> s2 and <= s3  
-s4 = 20. * header.zScale   ;> s3 and <= s4 
-s5 = 30. * header.zScale   ;>= s5 
+s1 = 1.  ;<= s1  
+s2 = 2.5 ;> s1 and <= s2
+s3 = 10. ;> s2 and <= s3  
+s4 = 20. ;> s3 and <= s4 
+s5 = 30. ;>= s5 
 
 if nFiles eq 1 then doMosaic = 1
 
@@ -612,26 +612,41 @@ for b=0,nFiles-1 do begin
                             dataArray[i,k,products.vdensity.index]  =  (float(crwncount)/float(grndcount)) * 100D
                         if products.vcover.doIt then $ 
                             dataArray[i,k,products.vcover.index]  =  (float(crwncount)/float(nht)) * 100D
+                            
                         if products.stratum0.doIt then $
                             dataArray[i,k,products.stratum0.index]  = (float(grndcount)/float(nht)) * 100D
-                        if products.stratum1.doIt then $
-                            dataArray[i,k,products.stratum1.index]  = (float(n_elements(where(height gt 0 and height le s1))) $
-                                                                        /float(abov0ct)) *100D
-                        if products.stratum2.doIt then $
-                            dataArray[i,k,products.stratum2.index]  = (float(n_elements(where(height gt s1 and height le s2))) $
-                                                                        /float(abov0ct)) *100D
-                        if products.stratum3.doIt then $
-                            dataArray[i,k,products.stratum3.index]  = (float(n_elements(where(height gt s2 and height le s3))) $
-                                                                        /float(abov0ct)) *100D 
-                        if products.stratum4.doIt then $
-                           dataArray[i,k,products.stratum4.index]  = (float(n_elements(where(height gt s3 and height le s4))) $
-                                                                        /float(abov0ct)) *100D 
-                        if products.stratum5.doIt then $
-                           dataArray[i,k,products.stratum5.index]  = (float(n_elements(where(height gt s4 and height le s5))) $
-                                                                        /float(abov0ct)) *100D
-                        if products.stratum6.doIt then $
-                           dataArray[i,k,products.stratum6.index]  = (float(n_elements(where(height gt s5))) $
-                                                                        /float(abov0ct)) *100D
+                            
+                        if products.stratum1.doIt then begin
+                            s01 = where(height gt 0 and height le s1, c_s01)
+                            dataArray[i,k,products.stratum1.index]  = (float(c_s01) / float(abov0ct)) * 100D                                               
+                        endif
+                        
+                        
+                        if products.stratum2.doIt then begin
+                             s12 = where(height gt s1 and height le s2, c_s12)
+                             dataArray[i,k,products.stratum2.index]  = (float(c_s12) / float(abov0ct)) * 100D                                                 
+                        endif
+                        
+                        if products.stratum3.doIt then begin
+                            s23 = where(height gt s2 and height le s3, c_s23)
+                            dataArray[i,k,products.stratum3.index]  = (float(c_s23) / float(abov0ct)) * 100D                                        
+                        endif
+                        
+                        if products.stratum4.doIt then begin
+                           s34 = where(height gt s3 and height le s4, c_s34)
+                           dataArray[i,k,products.stratum4.index]  = (float(c_s34) / float(abov0ct)) * 100D
+                        endif
+                           
+                        if products.stratum5.doIt then begin
+                           s45 = where(height gt s4 and height le s5, c_s45)
+                           dataArray[i,k,products.stratum5.index]  = (float(c_s45) / float(abov0ct)) * 100D
+                        endif
+                                                                        
+                        if products.stratum6.doIt then begin
+                           s5p = where(height gt s5, c_s5p)
+                           dataArray[i,k,products.stratum6.index]  = (float(c_s5p) / float(abov0ct)) * 100D
+                        endif
+                                                                                                
                         if products.crrElev.doIt then $
                             dataArray[i,k,products.crrElev.index]  = (float((momht[0]-minht))/float((maxht-minht)))
                         if products.texElev.doIt and (ntex ne 0) then $
