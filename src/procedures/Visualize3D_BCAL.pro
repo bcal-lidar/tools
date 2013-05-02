@@ -381,7 +381,14 @@ for a=0,n_elements(*info.filesPtr)-1 do begin
 
     dStart = total(nTemp[0:a], /int) - nTemp[a]
 
-    for b=0L, nTemp[a]-1 do data[dStart+b] = assocData[index[b]]
+    for b=0L, nTemp[a]-1 do begin
+        
+        data[dStart+b] = assocData[index[b]]
+        data[dStart+b].east = data[dStart+b].east * inputheader.xScale + inputheader.xOffset
+        data[dStart+b].north = data[dStart+b].north * inputheader.yScale + inputheader.yOffset
+        data[dStart+b].elev = data[dStart+b].elev * inputheader.zScale + inputheader.zOffset
+        
+    endfor
 
     free_lun, assocLun
 
@@ -394,9 +401,9 @@ endfor
 
 widget_control, /hourglass
 mesh_obj, 0, vert, poly, $
-        transpose([[(*info.dataPtr).east  * info.header.xScale + info.header.xOffset], $
-                   [(*info.dataPtr).north * info.header.yScale + info.header.yOffset], $
-                   [(*info.dataPtr).elev  * info.header.zScale + info.header.zOffset]])
+        transpose([[(*info.dataPtr).east], $
+                   [(*info.dataPtr).north], $
+                   [(*info.dataPtr).elev]])
 
 info.poly->SetProperty, data=vert, polygons=poly
 
