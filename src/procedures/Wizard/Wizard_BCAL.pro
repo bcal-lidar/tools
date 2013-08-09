@@ -14,6 +14,9 @@ PRO Wizard_BCAL_event, ev
       Widget_Control, stash.nextBtn, Sensitive=0
       WIDGET_CONTROL, stash.currentContent, MAP=0
       WIDGET_CONTROL, stash.dataInput, MAP=1
+      
+      WIDGET_CONTROL, stash.intro, GET_VALUE=rootFolder
+      stash.baseDir = rootFolder
       stash.currentContent = stash.dataInput
       
       WIDGET_CONTROL, ev.TOP, SET_UVALUE=stash
@@ -21,15 +24,15 @@ PRO Wizard_BCAL_event, ev
     'DataInput': BEGIN
       IF command EQ 'Next' THEN BEGIN        
         ;we also want to grab the file name specified 
-        WIDGET_CONTROL, stash.dataInput, GET_VALUE=fileName
+        WIDGET_CONTROL, stash.dataInput, GET_VALUE=inputFiles
         ;get and store the base directory
-        baseDir = DirectoryFromFile(fileName)
+        ;baseDir = DirectoryFromFile(fileName)
        
         WIDGET_CONTROL, stash.procMsg, MAP=1
          Widget_Control, stash.prevBtn, Sensitive=0
          Widget_Control, stash.nextBtn, Sensitive=0
         
-        processedFiles = Preprocess_Data(fileName)
+        processedFiles = Preprocess_Data(inputFiles, stash.baseDir)
         
         Widget_Control, stash.prevBtn, Sensitive=1
         Widget_Control, stash.nextBtn, Sensitive=1
@@ -38,13 +41,9 @@ PRO Wizard_BCAL_event, ev
         WIDGET_CONTROL, stash.heightFiltering, MAP=1
         stash.currentContent = stash.heightFiltering
         
-        
-         
-        
-         
         newStash = {nextBtn:stash.nextBtn, prevBtn:stash.prevBtn, currentContent:stash.currentContent, $
           intro:stash.intro, dataInput:stash.dataInput, dataGen:stash.dataGen, $
-          processedFiles:processedFiles, heightFiltering:stash.heightFiltering, baseDir:baseDir, procMsg:stash.procMsg}
+          processedFiles:processedFiles, heightFiltering:stash.heightFiltering, baseDir:stash.baseDir, procMsg:stash.procMsg}
         
         WIDGET_CONTROL, ev.TOP, SET_UVALUE=newStash
       ENDIF ELSE BEGIN
@@ -163,10 +162,11 @@ PRO Wizard_BCAL, ev
   
   ;Create the Next and Prev buttons
   prevBtn = WIDGET_BUTTON(buttonGroup, UVALUE='prevBtn', value='Previous', FONT='Arial*15', XSIZE=60, /ALIGN_CENTER, SENSITIVE=0)
-  nextBtn = WIDGET_BUTTON(buttonGroup, UVALUE='nextBtn', value='Next', FONT='Arial*15', XSIZE=60, /ALIGN_CENTER)
+  nextBtn = WIDGET_BUTTON(buttonGroup, UVALUE='nextBtn', value='Next', FONT='Arial*15', XSIZE=60, /ALIGN_CENTER, SENSITIVE=0)
    
+  baseDir = ''
   stash = { nextBtn:nextBtn, prevBtn:prevBtn, currentContent:introBase, intro:introBase, dataInput:dataInputBase, $
-    dataGen:dataGenBase, heightFiltering:dataHeightFilteringBase, procMsg:textBase}
+    dataGen:dataGenBase, heightFiltering:dataHeightFilteringBase, procMsg:textBase, baseDir:baseDir}
 
   ; Realize the widgets, set the user value of the top-level
   ; base, and call XMANAGER to manage everything.

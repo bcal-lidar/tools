@@ -1,14 +1,24 @@
 ;This file is for preprocessing the data by Tiling and buffering the data as necessary
 
-function Preprocess_Data, fileName
+function Preprocess_Data, inputFiles, outputDir
   
-  ;Now get the file info
-  FileData = FILE_INFO(fileName)
-  ;file size in bytes
+  numFiles = N_Elements(inputFiles)
+  maxInputFileSize = 0
   
-  FileSize = FileData.Size
+  for i=0,numFiles-1 do begin
+    FileData = FILE_INFO(inputFiles[i])
+    FileSize = FileData.Size
+    
+    if FileSize gt maxInputFileSize then maxInputFileSize = FileSize   
+    
+    ;copy the input file
+    
+  endfor
+  
   maxSize = 200000000
-  IF (FileSize GT maxSize) THEN BEGIN  
+  
+  
+  IF (maxInputFileSize GT maxSize) THEN BEGIN  
    
    ;!!!!!!!Testing Code!!!!!!!!
    ;TestDir = DirectoryFromFile(fileName)
@@ -20,11 +30,11 @@ function Preprocess_Data, fileName
    
    
    ;We need to tile the data and buffer it as well
-   inputFiles = STRARR(1)
-   inputFiles[0] = fileName
+   ;inputFiles = STRARR(1)
+   ;inputFiles[0] = fileName
    ;get the base directory from the input files
    
-   outputDir = DirectoryFromFile(inputFiles[0])  
+   ;outputDir = DirectoryFromFile(inputFiles[0])  
    
    TiledFiles = TileFile(inputFiles, STRTRIM(outputDir))
    ProcedFiles = BufferFiles(TiledFiles, STRTRIM(outputDir))
@@ -32,9 +42,9 @@ function Preprocess_Data, fileName
    
   ENDIF ELSE BEGIN
     ;just set up an array and return the one file in it
-    ProcedFiles = STRARR(1)
-    ProcedFiles[0] = fileName
-    return, ProcedFiles
+    ;ProcedFiles = STRARR(1)
+    ;ProcedFiles[0] = fileName
+    return, inputFiles
   ENDELSE  
   
 end
