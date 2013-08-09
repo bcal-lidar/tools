@@ -16,8 +16,7 @@ PRO WIZARD_DATA_INPUT_EV, ev
   CASE command OF    
     'FileBrowse': BEGIN
         ;get the file
-        inputFiles = GetFiles();
-        
+        inputFiles = GetFiles()
         ;get the array
         
         ;list = WIDGET_INFO(fileLoadStash.fileLoadList)
