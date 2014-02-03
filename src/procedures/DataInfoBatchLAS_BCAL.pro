@@ -209,7 +209,7 @@ for a=0,nFiles-1 do begin
                       strcompress(header.yMin), d, $
                       strcompress(header.yMax), d, $
                       strcompress(bArea), d, $
-                      strcompress(floor(header.npoints/bArea)), d, $
+                      strcompress(header.npoints/bArea), d, $
                       strcompress(header.nPoints), d, $
                       strcompress(header.nReturns[0]), d, $
                       strcompress(header.nReturns[1]), d, $
