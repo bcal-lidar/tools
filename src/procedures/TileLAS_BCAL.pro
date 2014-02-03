@@ -191,6 +191,7 @@ endfor
 
 nTiles     = xNum * yNum
 tilePoints = lonarr(nTiles)
+tileReturns = lonarr(5, nTiles)
 tileExtent = dblarr(nTiles,3,2)
 tileExtent[*,*,0] = 10e8
 
@@ -263,6 +264,8 @@ for a=0,nFiles-1 do begin
                 writeu, clun, data[index[index[c]:index[c+1]-1]]
 
                 tilePoints[c] += tileHist[c]
+                
+                tileReturns[*,c] += histogram((data[index[index[c]:index[c+1]-1]].nReturn mod 8), min=1, max=5)
 
                 tileExtent[c,0,0] <= min(x[index[index[c]:index[c+1]-1]], max=xMaxTemp)
                 tileExtent[c,0,1] >= xMaxTemp
@@ -306,7 +309,7 @@ for s=0,xNum-1 do begin
         ; Set necessary header parameters
 
     outputHeader.nPoints     = tilePoints[updateLun]
-    outputHeader.nReturns[0] = tilePoints[updateLun]
+    outputHeader.nReturns    = tileReturns[*,updateLun]
 
         ; Set mins & maxs
 
@@ -318,7 +321,6 @@ for s=0,xNum-1 do begin
     outputHeader.zMax = tileExtent[updateLun,2,1]
     
     outputFile = outputDir + '\Tile_' + strcompress(updateLun+1,/remove) + '.las'
-;    outputFile = outputDir + '\' + strcompress(s+1,/remove) + '_' + strcompress(t+1,/remove) + '.las'
 
         ; Update file headers
 
@@ -341,4 +343,3 @@ end
 
 ;NOTES:
 ;-uniqueness
-; -individual pulses/files?
