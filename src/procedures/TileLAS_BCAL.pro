@@ -265,6 +265,7 @@ for a=0,nFiles-1 do begin
 
                 tilePoints[c] += tileHist[c]
                 
+                if n_elements(data[index[index[c]:index[c+1]-1]]) gt 1 then $
                 tileReturns[*,c] += histogram((data[index[index[c]:index[c+1]-1]].nReturn mod 8), min=1, max=5)
 
                 tileExtent[c,0,0] <= min(x[index[index[c]:index[c+1]-1]], max=xMaxTemp)
