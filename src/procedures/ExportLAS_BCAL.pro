@@ -68,13 +68,13 @@ compile_opt idl2, logical_predicate
 
     ; Establish an error handler.
 
-catch, theError
-if theError ne 0 then begin
-    catch, /cancel
-    help, /last_message, output=errText
-    errMsg = dialog_message(errText, /error, title='Error creating file')
-    return
-endif
+;catch, theError
+;if theError ne 0 then begin
+;    catch, /cancel
+;    help, /last_message, output=errText
+;    errMsg = dialog_message(errText, /error, title='Error creating file')
+;    return
+;endif
 
     ; Get the file(s) to be subset.
 
@@ -143,7 +143,12 @@ case exportType of
                classList = ['Never classified (0)','Unclassified (1)','Ground (2)', $
                               'Low vegetation (3)','Medium vegetation (4)', 'High vegetation (5)', $
                               'Building (6)', 'Low point (Noise) (7)', 'Model Key Points (8)', $
-                              'Water (9)', 'Reserved (10)', 'Reserved (11)', 'Overlap Points (12)']
+                              'Water (9)', 'Reserved (10)', 'Reserved (11)', 'Overlap Points (12)', $
+                              'Superceded (13)', 'Class 14 (14)', 'Class 15 (15)', 'Class 16 (16)', $
+                              'Class 17 (17)', 'Class 18 (18)', 'Class 19 (19)', 'Class 20 (20)', $
+                              'Class 21 (21)', 'Class 22 (22)', 'Class 23 (23)', 'Class 24 (24)', $
+                              'Class 25 (25)', 'Class 26 (26)', 'Class 27 (27)', 'Class 28 (28)', $ 
+                              'Class 29 (29)', 'Class 30 (30)', 'Class 31 (31)']
                dummy      = widget_multi(topBase, list=classList, prompt='Select classes to export:', ysize=150, $
                               uvalue='exportN', /auto)
                
@@ -242,7 +247,7 @@ for a=0,nFiles-1 do begin
                     
                     if count ne 0 then begin
                     
-                        if i eq 0 then begin
+                        if p eq 0 then begin
                         
                             odata = data[dindex]
                         
@@ -274,7 +279,7 @@ for a=0,nFiles-1 do begin
 
                     if count ne 0 then begin
                         
-                        if i eq 0 then begin
+                        if p eq 0 then begin
     
                             odata = data[dindex]
                         
@@ -293,7 +298,7 @@ for a=0,nFiles-1 do begin
       
           'exportClass': begin
                 
-                classIndex =[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+                classIndex =indgen(32)
                 classNames = classIndex[where(exportIndex eq 1, nOut)]  
                 
                 for i = 0, nOut-1 do begin
@@ -302,7 +307,7 @@ for a=0,nFiles-1 do begin
                     
                     if count ne 0 then begin
                     
-                        if i eq 0 then begin
+                        if p eq 0 then begin
 
                             odata = data[dindex]
                         
