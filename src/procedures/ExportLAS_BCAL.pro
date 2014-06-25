@@ -68,13 +68,13 @@ compile_opt idl2, logical_predicate
 
     ; Establish an error handler.
 
-;catch, theError
-;if theError ne 0 then begin
-;    catch, /cancel
-;    help, /last_message, output=errText
-;    errMsg = dialog_message(errText, /error, title='Error creating file')
-;    return
-;endif
+catch, theError
+if theError ne 0 then begin
+    catch, /cancel
+    help, /last_message, output=errText
+    errMsg = dialog_message(errText, /error, title='Error creating file')
+    return
+endif
 
     ; Get the file(s) to be subset.
 
