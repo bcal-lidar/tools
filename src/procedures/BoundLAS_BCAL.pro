@@ -121,6 +121,7 @@ outBase = widget_auto_base(title='Save EVF File')
                         uvalue='evfName', /auto_manage)
     dummy = widget_menu(outBase, default_array=[1], list=['Export as shapefile'],   uvalue='shpfile',  /auto)                  
     dummy = widget_menu(outBase, default_array=[0], list=['Export as KML'],   uvalue='kmlfile',  /auto)
+    dummy = widget_menu(outBase, default_array=[0], list=['Create boundary from LAS header (faster)'],   uvalue='headBound',  /auto)
     
 result = auto_wid_mng(outBase)
 
@@ -138,18 +139,7 @@ if (result.kmlfile eq 1) then kmlFile = file_basename(evfFile, '.evf') + '.kml'
 if nFiles eq 1 then layerName = 'Boundary of ' + file_basename(inputFiles[0]) $
                else layerName = 'Boundary'
 
-    ; Initialize the attribute structure for the DBF file
 
-dbfAttributes = replicate({Name        : '', $
-                           Points      : 0L, $
-                           Density     : 0E, $
-                           Swaths      : 0L, $
-                           TotalArea   : 0E, $
-                           FirstPts    : 0L, $
-                           SecondPts   : 0L, $
-                           ThirdPts    : 0L, $
-                           FourthPts   : 0L, $
-                           FifthPts    : 0L}, nFiles)
 
     ; Intitialize the EVF file
 
@@ -162,6 +152,19 @@ statText  = 'Initializing'
 statBase  = widget_auto_base(title='Boundary Status')
 statField = widget_text(statBase, /scroll, value=statText, xsize=80, ysize=4)
 widget_control, statBase, /realize
+
+; Initialize the attribute structure for the DBF file
+
+dbfAttributes = replicate({Name        : '', $
+                          Points      : 0L, $
+                          Density     : 0E, $
+                          Swaths      : 0L, $
+                          TotalArea   : 0E, $
+                          FirstPts    : 0L, $
+                          SecondPts   : 0L, $
+                          ThirdPts    : 0L, $
+                          FourthPts   : 0L, $
+                          FifthPts    : 0L}, nFiles)
 
     ; Convert to KML file 
     
@@ -225,127 +228,190 @@ for a=0, nFiles-1 do begin
     statText = ['Bounding ' + inputFiles[a] + ' (' + strcompress(a+1,/remove) $
                                             + '/'  + strcompress(nFiles,/remove) + ')', statText]
     widget_control, statField, set_value=statText
-
+    
+    if (result.headBound eq 1) then begin
+      
+      ReadLAS_BCAL, inputFiles[a], header, /nodata
+            
+      envi_evf_define_add_record, evfPtr, transpose([[header.xMin, header.xMax, header.xMax, header.xMin, header.xMin], $
+        [header.yMin, header.yMin, header.yMax, header.yMax, header.yMin]])
+      
+      dbfAttributes[a].Name        = file_basename(inputFiles[a])
+      dbfAttributes[a].Points      = header.nPoints
+      dbfAttributes[a].FirstPts = header.nReturns[0]
+      dbfAttributes[a].SecondPts = header.nReturns[1]
+      dbfAttributes[a].ThirdPts  = header.nReturns[2]
+      dbfAttributes[a].FourthPts  = header.nReturns[3]
+      dbfAttributes[a].FifthPts  = header.nReturns[4]
+      
+      ; Process each record for KML file
+      
+      if (result.kmlfile eq 1) then begin
+      
         ; Read the input file and determine the boundary points, the overall area, and the number
         ; of returns
-
-    ReadLAS_BCAL, inputFiles[a], header, data
-
-    bPoints  = GetBounds_BCAL(data.east * header.xScale, data.north * header.yScale, precision=precision)
-    bArea    = poly_area(data[bPoints].east  * header.xScale + header.xOffset, $
-                         data[bPoints].north * header.yScale + header.yOffset)
-    
-    ; count flight lines
-   
-   if (header.pointFormat eq 1) or (header.pointFormat eq 3) then begin
-       minTime = min(data.time, max=maxTime)
-       
-       tMin = floor(minTime)
-       tMax =  ceil(maxTime)
-       tRange = tMax - tMin
-       tHist = histogram(data.time, min=tMin)
-       tLine = ([0,tHist[0:tRange-2]] eq 0) and (tHist[0:tRange-1] ne 0)
-       nLines = total(tLine, /integer)
-
-   end
-   
-   ; calculate statistics
-   
-   elevmom= moment((data.elev * header.zScale + header.zOffset), maxmoment=2, sdev=sdevelev)
-   intenmom= moment(data.inten, maxmoment=2, sdev=sdevinten)
-   anglemom= moment((data.angle - 128B), maxmoment=2, sdev=sdevangle)
-   
-   ; classification
-   
-   dummy = where(data.class eq 0, cl0cnt)
-   dummy = where(data.class eq 1, cl1cnt)
-   dummy = where(data.class eq 2, cl2cnt)
-   dummy = where(data.class eq 3, cl3cnt)
-   dummy = where(data.class ge 4, cl4cnt)
-
-        ; Record the boundary of each input file as a record in the EVF file
-
-    envi_evf_define_add_record, evfPtr, transpose([[data[bPoints].east  * header.xScale + header.xOffset], $
-                                                   [data[bPoints].north * header.yScale + header.yOffset]])
-   
-   
-        ; Record the DBF attributes for the input file
-
-    dbfAttributes[a].Name        = file_basename(inputFiles[a])
-    dbfAttributes[a].Points      = header.nPoints
-    dbfAttributes[a].Density     = header.nPoints / bArea
-    dbfAttributes[a].Swaths      = header.nPoints / bArea
-    if (header.pointFormat eq 1) or (header.pointFormat eq 3) then $
-    dbfAttributes[a].TotalArea   = nLines
-    dbfAttributes[a].FirstPts = header.nReturns[0]
-    dbfAttributes[a].SecondPts = header.nReturns[1]
-    dbfAttributes[a].ThirdPts  = header.nReturns[2]
-    dbfAttributes[a].FourthPts  = header.nReturns[3]
-    dbfAttributes[a].FifthPts  = header.nReturns[4]
-    
-        ; Process each record for KML file
         
-    if (result.kmlfile eq 1) then begin
-
-      xCoords = data[bPoints].east  * header.xScale + header.xOffset
-      yCoords = data[bPoints].north * header.yScale + header.yOffset
-
+        xCoords = [header.xMin, header.xMax, header.xMax, header.xMin, header.xMin]
+        yCoords = [header.yMin, header.yMin, header.yMax, header.yMax, header.yMin]
+        
         ; Convert the coordinates from UTM to lat/lon
-
-      envi_convert_projection_coordinates, xCoords, yCoords, projInfo, xOut, yOut, oProj
-
-      printf, kmlout, '<Placemark>'
-      printf, kmlout, '<name>' + file_basename(inputFiles[a]) + '</name>'
-      printf, kmlout, '<styleUrl>#Features</styleUrl>'
-      printf, kmlout, '<ExtendedData>'
-      printf, kmlout, '<Data name="retDensity"><value>'+ strcompress(header.nPoints/bArea)+'</value></Data>'
-      printf, kmlout, '<Data name="area"><value>'+strcompress(bArea)+'</value></Data>
-      if (header.pointFormat eq 1) or (header.pointFormat eq 3) then begin
-        printf, kmlout, '<Data name="nflight"><value>'+strcompress(nLines)+'</value></Data>
-      endif
-      printf, kmlout, '<Data name="allRet"><value>'+strcompress(header.nPoints)+'</value></Data>
-      printf, kmlout, '<Data name="firstRet"><value>'+strcompress(header.nReturns[0])+'</value></Data>
-      printf, kmlout, '<Data name="secondRet"><value>'+strcompress(header.nReturns[1])+'</value></Data>
-      printf, kmlout, '<Data name="thirdRet"><value>'+strcompress(header.nReturns[2])+'</value></Data>
-      printf, kmlout, '<Data name="fourthRet"><value>'+strcompress(header.nReturns[3])+'</value></Data>
-      printf, kmlout, '<Data name="fifthRet"><value>'+strcompress(header.nReturns[4])+'</value></Data>
-      printf, kmlout, '<Data name="class0"><value>'+strcompress(cl0cnt)+'</value></Data>
-      printf, kmlout, '<Data name="class1"><value>'+strcompress(cl1cnt)+'</value></Data>
-      printf, kmlout, '<Data name="class2"><value>'+strcompress(cl2cnt)+'</value></Data>
-      printf, kmlout, '<Data name="class3"><value>'+strcompress(cl3cnt)+'</value></Data>
-      printf, kmlout, '<Data name="class4"><value>'+strcompress(cl4cnt)+'</value></Data>
-      printf, kmlout, '<Data name="minElev"><value>'+strcompress(header.zmin)+'</value></Data>
-      printf, kmlout, '<Data name="meanElev"><value>'+strcompress(elevmom[0])+'</value></Data>
-      printf, kmlout, '<Data name="maxElev"><value>'+strcompress(header.zmax)+'</value></Data>
-      printf, kmlout, '<Data name="stdElev"><value>'+strcompress(sdevelev)+'</value></Data>
-      printf, kmlout, '<Data name="minInt"><value>'+strcompress(min(data.inten, max=maxinten))+'</value></Data>
-      printf, kmlout, '<Data name="meanInt"><value>'+strcompress(intenmom[0])+'</value></Data>
-      printf, kmlout, '<Data name="maxInt"><value>'+strcompress(maxinten)+'</value></Data>
-      printf, kmlout, '<Data name="stdInt"><value>'+strcompress(sdevinten)+'</value></Data>
-      printf, kmlout, '<Data name="minScan"><value>'+strcompress(min(data.angle-128B,max=maxAngle) - 128)+'</value></Data>
-      printf, kmlout, '<Data name="meanScan"><value>'+strcompress(anglemom[0]-128)+'</value></Data>
-      printf, kmlout, '<Data name="maxScan"><value>'+strcompress(maxAngle - 128)+'</value></Data>
-      printf, kmlout, '<Data name="stdScan"><value>'+strcompress(sdevangle)+'</value></Data>
-      printf, kmlout, '</ExtendedData>'
-      printf, kmlout, '<MultiGeometry>'
-      printf, kmlout, '<Polygon>'
-      printf, kmlout, '<outerBoundaryIs>'
-      printf, kmlout, '<LinearRing>'
-      printf, kmlout, '<coordinates>'
-
-      for j=0, n_elements(xOut)-1 do printf, $
-        kmlout, strcompress(xOut[j], /remove) + ',' + strcompress(yOut[j], /remove)
-
-      printf, kmlout, '</coordinates>'
-      printf, kmlout, '</LinearRing>'
-      printf, kmlout, '</outerBoundaryIs>'
-      printf, kmlout, '</Polygon>'
-      printf, kmlout, '</MultiGeometry>'
-      printf, kmlout, '</Placemark>'
-    
-    endif
         
-        ; Set data to 0 to clear up memory
+        envi_convert_projection_coordinates, xCoords, yCoords, projInfo, xOut, yOut, oProj
+        
+        printf, kmlout, '<Placemark>'
+        printf, kmlout, '<name>' + file_basename(inputFiles[a]) + '</name>'
+        printf, kmlout, '<styleUrl>#Features</styleUrl>'
+        printf, kmlout, '<ExtendedData>'
+        printf, kmlout, '<Data name="allRet"><value>'+strcompress(header.nPoints)+'</value></Data>
+        printf, kmlout, '<Data name="firstRet"><value>'+strcompress(header.nReturns[0])+'</value></Data>
+        printf, kmlout, '<Data name="secondRet"><value>'+strcompress(header.nReturns[1])+'</value></Data>
+        printf, kmlout, '<Data name="thirdRet"><value>'+strcompress(header.nReturns[2])+'</value></Data>
+        printf, kmlout, '<Data name="fourthRet"><value>'+strcompress(header.nReturns[3])+'</value></Data>
+        printf, kmlout, '<Data name="fifthRet"><value>'+strcompress(header.nReturns[4])+'</value></Data>
+        printf, kmlout, '<Data name="minElev"><value>'+strcompress(header.zmin)+'</value></Data>
+        printf, kmlout, '<Data name="maxElev"><value>'+strcompress(header.zmax)+'</value></Data>
+        printf, kmlout, '</ExtendedData>'
+        printf, kmlout, '<MultiGeometry>'
+        printf, kmlout, '<Polygon>'
+        printf, kmlout, '<outerBoundaryIs>'
+        printf, kmlout, '<LinearRing>'
+        printf, kmlout, '<coordinates>'
+        
+        for j=0, n_elements(xOut)-1 do printf, $
+          kmlout, strcompress(xOut[j], /remove) + ',' + strcompress(yOut[j], /remove)
+          
+        printf, kmlout, '</coordinates>'
+        printf, kmlout, '</LinearRing>'
+        printf, kmlout, '</outerBoundaryIs>'
+        printf, kmlout, '</Polygon>'
+        printf, kmlout, '</MultiGeometry>'
+        printf, kmlout, '</Placemark>'
+        
+      endif
+      
+    endif else begin
+      
+      ; Read the input file and determine the boundary points, the overall area, and the number
+      ; of returns
+      
+      ReadLAS_BCAL, inputFiles[a], header, data
+      
+      bPoints  = GetBounds_BCAL(data.east * header.xScale, data.north * header.yScale, precision=precision)
+      bArea    = poly_area(data[bPoints].east  * header.xScale + header.xOffset, $
+        data[bPoints].north * header.yScale + header.yOffset)
+      
+      ; count flight lines
+      
+      if (header.pointFormat eq 1) or (header.pointFormat eq 3) then begin
+        minTime = min(data.time, max=maxTime)
+        
+        tMin = floor(minTime)
+        tMax =  ceil(maxTime)
+        tRange = tMax - tMin
+        tHist = histogram(data.time, min=tMin)
+        tLine = ([0,tHist[0:tRange-2]] eq 0) and (tHist[0:tRange-1] ne 0)
+        nLines = total(tLine, /integer)
+        
+      end
+      
+      ; calculate statistics
+      
+      elevmom= moment((data.elev * header.zScale + header.zOffset), maxmoment=2, sdev=sdevelev)
+      intenmom= moment(data.inten, maxmoment=2, sdev=sdevinten)
+      anglemom= moment((data.angle - 128B), maxmoment=2, sdev=sdevangle)
+      
+      ; classification
+      
+      dummy = where(data.class eq 0, cl0cnt)
+      dummy = where(data.class eq 1, cl1cnt)
+      dummy = where(data.class eq 2, cl2cnt)
+      dummy = where(data.class eq 3, cl3cnt)
+      dummy = where(data.class ge 4, cl4cnt)
+      
+      ; Record the boundary of each input file as a record in the EVF file
+      
+      envi_evf_define_add_record, evfPtr, transpose([[data[bPoints].east  * header.xScale + header.xOffset], $
+        [data[bPoints].north * header.yScale + header.yOffset]])
+      
+      ; Record the DBF attributes for the input file
+      
+      dbfAttributes[a].Name        = file_basename(inputFiles[a])
+      dbfAttributes[a].Points      = header.nPoints
+      dbfAttributes[a].Density     = header.nPoints / bArea
+      dbfAttributes[a].Swaths      = header.nPoints / bArea
+      if (header.pointFormat eq 1) or (header.pointFormat eq 3) then $
+        dbfAttributes[a].TotalArea   = nLines
+      dbfAttributes[a].FirstPts = header.nReturns[0]
+      dbfAttributes[a].SecondPts = header.nReturns[1]
+      dbfAttributes[a].ThirdPts  = header.nReturns[2]
+      dbfAttributes[a].FourthPts  = header.nReturns[3]
+      dbfAttributes[a].FifthPts  = header.nReturns[4]
+      
+      ; Process each record for KML file
+      
+      if (result.kmlfile eq 1) then begin
+      
+        xCoords = data[bPoints].east  * header.xScale + header.xOffset
+        yCoords = data[bPoints].north * header.yScale + header.yOffset
+        
+        ; Convert the coordinates from UTM to lat/lon
+        
+        envi_convert_projection_coordinates, xCoords, yCoords, projInfo, xOut, yOut, oProj
+        
+        printf, kmlout, '<Placemark>'
+        printf, kmlout, '<name>' + file_basename(inputFiles[a]) + '</name>'
+        printf, kmlout, '<styleUrl>#Features</styleUrl>'
+        printf, kmlout, '<ExtendedData>'
+        printf, kmlout, '<Data name="retDensity"><value>'+ strcompress(header.nPoints/bArea)+'</value></Data>'
+        printf, kmlout, '<Data name="area"><value>'+strcompress(bArea)+'</value></Data>
+        if (header.pointFormat eq 1) or (header.pointFormat eq 3) then begin
+          printf, kmlout, '<Data name="nflight"><value>'+strcompress(nLines)+'</value></Data>
+        endif
+        printf, kmlout, '<Data name="allRet"><value>'+strcompress(header.nPoints)+'</value></Data>
+        printf, kmlout, '<Data name="firstRet"><value>'+strcompress(header.nReturns[0])+'</value></Data>
+        printf, kmlout, '<Data name="secondRet"><value>'+strcompress(header.nReturns[1])+'</value></Data>
+        printf, kmlout, '<Data name="thirdRet"><value>'+strcompress(header.nReturns[2])+'</value></Data>
+        printf, kmlout, '<Data name="fourthRet"><value>'+strcompress(header.nReturns[3])+'</value></Data>
+        printf, kmlout, '<Data name="fifthRet"><value>'+strcompress(header.nReturns[4])+'</value></Data>
+        printf, kmlout, '<Data name="class0"><value>'+strcompress(cl0cnt)+'</value></Data>
+        printf, kmlout, '<Data name="class1"><value>'+strcompress(cl1cnt)+'</value></Data>
+        printf, kmlout, '<Data name="class2"><value>'+strcompress(cl2cnt)+'</value></Data>
+        printf, kmlout, '<Data name="class3"><value>'+strcompress(cl3cnt)+'</value></Data>
+        printf, kmlout, '<Data name="class4"><value>'+strcompress(cl4cnt)+'</value></Data>
+        printf, kmlout, '<Data name="minElev"><value>'+strcompress(header.zmin)+'</value></Data>
+        printf, kmlout, '<Data name="meanElev"><value>'+strcompress(elevmom[0])+'</value></Data>
+        printf, kmlout, '<Data name="maxElev"><value>'+strcompress(header.zmax)+'</value></Data>
+        printf, kmlout, '<Data name="stdElev"><value>'+strcompress(sdevelev)+'</value></Data>
+        printf, kmlout, '<Data name="minInt"><value>'+strcompress(min(data.inten, max=maxinten))+'</value></Data>
+        printf, kmlout, '<Data name="meanInt"><value>'+strcompress(intenmom[0])+'</value></Data>
+        printf, kmlout, '<Data name="maxInt"><value>'+strcompress(maxinten)+'</value></Data>
+        printf, kmlout, '<Data name="stdInt"><value>'+strcompress(sdevinten)+'</value></Data>
+        printf, kmlout, '<Data name="minScan"><value>'+strcompress(min(data.angle-128B,max=maxAngle) - 128)+'</value></Data>
+        printf, kmlout, '<Data name="meanScan"><value>'+strcompress(anglemom[0]-128)+'</value></Data>
+        printf, kmlout, '<Data name="maxScan"><value>'+strcompress(maxAngle - 128)+'</value></Data>
+        printf, kmlout, '<Data name="stdScan"><value>'+strcompress(sdevangle)+'</value></Data>
+        printf, kmlout, '</ExtendedData>'
+        printf, kmlout, '<MultiGeometry>'
+        printf, kmlout, '<Polygon>'
+        printf, kmlout, '<outerBoundaryIs>'
+        printf, kmlout, '<LinearRing>'
+        printf, kmlout, '<coordinates>'
+        
+        for j=0, n_elements(xOut)-1 do printf, $
+          kmlout, strcompress(xOut[j], /remove) + ',' + strcompress(yOut[j], /remove)
+          
+        printf, kmlout, '</coordinates>'
+        printf, kmlout, '</LinearRing>'
+        printf, kmlout, '</outerBoundaryIs>'
+        printf, kmlout, '</Polygon>'
+        printf, kmlout, '</MultiGeometry>'
+        printf, kmlout, '</Placemark>'
+        
+      endif
+      
+    endelse
+
+     ; Set data to 0 to clear up memory
 
     data = [0]
 
