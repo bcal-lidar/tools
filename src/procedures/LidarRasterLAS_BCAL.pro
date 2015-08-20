@@ -81,12 +81,12 @@
 ; redistribute it freely, subject to the following restrictions:
 ;
 ; 1. The origin of this software must not be misrepresented; you must
-;    not claim you wrote the original software. If you use this software
+;    not claim you wrote the original softwar If you use this software
 ;    in a product, an acknowledgment in the product documentation
 ;    would be appreciated, but is not required.
 ;
 ; 2. Altered source versions must be plainly marked as such, and must
-;    not be misrepresented as being the original software.
+;    not be misrepresented as being the original softwar
 ;
 ; 3. This notice may not be removed or altered from any source distribution.
 ;
@@ -96,9 +96,62 @@
 ;###########################################################################
 
 
-    ; Begin main program
+; Begin main program
 
-pro LidarRasterLAS_BCAL, event
+pro LidarRasterLAS_BCAL, INPUTFILES=inputFiles, OUTPUTFILE=outputFile, MASKFILES=maskFiles, RETNUM=retNum, GRID=grid, NODATA=noData, DOOUTLIER=doOutlier, DOINTERP=doInterp, XMIN=userXMin, XMAX=userXMax, YMIN=userYMin, YMAX=userYMax   
+
+COMPILE_OPT IDL2
+
+ENVI, /RESTORE_BASE_SAVE_FILES
+ENVI_BATCH_INIT, /NO_STATUS_WINDOW
+
+args = COMMAND_LINE_ARGS(COUNT=argc)
+
+if argc gt 0 then begin
+  foreach arg, args do begin
+    case stregex(arg, '=', /BOOLEAN ) of
+      1 : begin
+        kwParts = strsplit( arg, '=', /EXTRAC)
+        case strupcase( strcompress (kwParts[0], /REMOVE_ALL ) ) of
+          'INPUTFILES' : inputFiles = STRTRIM( kwParts[1], 2 )
+          'OUTPUTFILE' : outputFile = STRTRIM( kwParts[1], 2 )
+          'MASKFILES' : maskFiles = STRTRIM( kwParts[1], 2 )
+          'RETNUM' : retNum = fix(kwParts[1])
+          'GRID' : grid = float(kwParts[1])
+          'NODATA' : noData = float(kwParts[1])
+          'DOOUTLIER' : doOutlier = fix(kwParts[1])
+          'DOINTERP' : doInterp = fix(kwParts[1])
+          'XMIN' : userXMin = float(kwParts[1])
+          'XMAX' : userXMax = float(kwParts[1])
+          'YMIN' : userYMin = float(kwParts[1])
+          'YMAX' : userYMax = float(kwParts[1])
+          
+          else: ; Unknown
+        endcase
+      end
+      else: ; Unknown
+    endcase
+  endforeach
+endif
+
+if N_ELEMENTS(maskFiles) eq 0 then doMask = 0 $
+  else doMask = 1
+
+if N_ELEMENTS(retNum) eq 0 then retNum = 3 ; jj: I think 1 is first, 2 is last, and 3 is both
+nReturns = 2
+if N_ELEMENTS(grid) eq 0 then grid = 5.0
+if N_ELEMENTS(noData) eq 0 then noData = -1
+if N_ELEMENTS(doOutlier) eq 0 then doOutlier = 0
+if N_ELEMENTS(doInterp) eq 0 then doInterp = 0
+
+; retNum    = 1, 2, or 3
+; grid      = Raster spacing (projection units)
+; noData    = value for no data
+; doInterp  = Interpolate empty pixels?
+; doMask    = Use vector mask(s)?
+; doMosaic  = Mosaic multiple files?
+; doOutlier = Include outliers?
+;prodIndex = result.products
 
 ; x & y are geographic coords
 ; i & j are tile raster coords
@@ -106,27 +159,51 @@ pro LidarRasterLAS_BCAL, event
 
 compile_opt idl2, logical_predicate
 
-    ; Establish an error handler
-
+; Establish an error handler
 catch, theError
 if theError ne 0 then begin
     catch, /cancel
     help, /last_message, output=errText
-    errMsg = dialog_message(errText, /error, title='Error creating file')
+    print, errText
     return
 endif
 
-;start = systime(/seconds)
+; Get the input file(s)
 
-    ; Get the input file(s)
+; Gotta figure out how to do multiple files
+;inputFiles is string array of canonical filenames
+nFiles = 1
 
-inputFiles = dialog_pickfile(title='Select LAS file(s)', filter='*.las', /multiple_files, /path)
-if (inputFiles[0] eq '') then return
 
-nFiles = n_elements(inputFiles)
+;todo: if maskFile present but not doMask then doMask default to true
+;maskFiles is string array of canonical filenames
+;maskFiles = dialog_pickfile(title='Select mask file(s)', filter='*.evf', /multiple_files, /path)
+; If requested, get the mask vector file(s).  Read them and add to a single container object.
+if doMask then begin
 
-    ; For each file, read the header and establish minimum and
-    ; maximum extents.  Also record the center point of each file.
+  if (maskFiles[0] eq '') then begin
+    doMask = 0
+    return
+  endif
+
+  nMask = n_elements(maskFiles)
+
+  for v=0,nMask-1 do begin
+
+    maskID = envi_evf_open(maskFiles[v])
+    envi_evf_info, maskID, num_recs=nRecs
+
+    for w=0,nRecs-1 do begin
+
+      maskCoords = envi_evf_read_record(maskID, w)
+      oMasks->Add, Obj_New('IDLanROI', maskCoords)
+
+    endfor
+
+    envi_evf_close, maskID
+
+  endfor
+endif
 
 for a=0,nFiles-1 do begin
 
@@ -150,37 +227,26 @@ for a=0,nFiles-1 do begin
 
 endfor
 
-    ; Establish default parameters
+;if n_tags(defProj) eq 0 then defProj = envi_proj_create(DATUM='North America 1983', TYPE=2, PARAMS=11, NAME='UTM')
+if n_tags(defProj) eq 0 then begin
+  defProj = envi_proj_create()
+  georef = 0
+endif else georef = 1
+ 
+; Default output max/min to the extents in input file(s), but use user values if present
+if N_ELEMENTS(userXMin) ne 0 then xMin = userXMin
+if N_ELEMENTS(userXMax) ne 0 then xMaxn = userXMax
+if N_ELEMENTS(userYMin) ne 0 then yMin = userYMin
+if N_ELEMENTS(userYMax) ne 0 then yMax = userYMax
 
-subsetVals = [xMin,xMax,yMin,yMax]
-subsetList = ['Min East','Max East','Min North','Max North']
 
-nReturns = 2
+; Make sure the ranges are an integer number of pixels. -jj: this isn't precisely true because floats
+mDim = ceil((xMax - xMin) / grid)
+nDim = ceil((yMax - yMin) / grid)
+xMax = xMin + mDim * grid
+yMax = yMin + nDim * grid
 
-returnList = indgen(nReturns) + 1
-returnList = ' Return ' + strcompress(returnList)
-returnList = [returnList,'All Returns']
-
-cDefault = 5
-cField   = 2
-if n_tags(defProj) then begin
-
-    units   = strlowcase(envi_translate_projection_units(defProj.units))
-    cPrompt = 'Enter raster spacing (' + units + '): '
-    if units eq 'degrees' then begin
-        cDefault = 0.0001D
-        cField   = 6
-    endif
-
-endif else begin
-
-    defProj = envi_proj_create()
-    cPrompt = 'Enter raster spacing (meters): '
-
-endelse
-
-    ; Create list of available data products
-
+; todo: Command line
 products = {maxElev    :{title:'Maximum Elevation',                  points:1, index:-1, doIt:0}, $
             minElev    :{title:'Minimum Elevation',                  points:1, index:-1, doIt:0}, $
             meanElev   :{title:'Mean Elevation',                     points:1, index:-1, doIt:0}, $
@@ -207,143 +273,33 @@ for f=0,nProducts-1 do productList[f] = products.(f).title
 
 if nFiles eq 1 then doMosaic = [0] else doMosaic = [1]
 
-    ; Create the widget that will record the user parameters
 
-gridBase = widget_auto_base(title='Raster Parameters')
+; todo: Add output projection parameter
+projInfo  = defProj
 
-    topBase    = widget_base(gridBase, /row)
-    leftBase   = widget_base(topBase, /column)
 
-    returnBase = widget_base(leftBase, /row)
-    dummy      = widget_pmenu(returnBase, list=returnList, default=nReturns, prompt='Select return number:     ', $
-                              uvalue='returns', /auto_manage)
-
-    cellBase   = widget_base(leftBase, /row)
-    dummy      = widget_param(cellBase, dt=5, default=cDefault, field=cField, prompt=cPrompt, uvalue='grid', /auto)
-
-    nullBase   = widget_base(leftBase, /row)
-    dummy      = widget_param(nullBase, default=-1, prompt='Enter value for No Data: ', uvalue='noData', /auto)
-
-    dummy      = widget_menu(leftBase, default_array=[1], list=['Interpolate empty pixels?'],   uvalue='inside',  /auto)
-    dummy      = widget_menu(leftBase, default_array=[0], list=['Use vector mask(s)?'],         uvalue='mask',    /auto)
-    dummy      = widget_menu(leftBase, default_array=doMosaic, list=['Mosaic multiple files?'], uvalue='mosaic',  /auto)
-    dummy      = widget_menu(leftBase, default_array=[1], list=['Ignore outliers?'],           uvalue='outlier', /auto)
-
-    subBase    = widget_base(leftBase, /row)
-    xBase      = widget_base(subBase, /column)
-    dummy      = widget_param(xBase, default=xMin, dt=5, field=cField, prompt='Minimum East:',  uvalue='xMin', xs=17, /auto)
-    dummy      = widget_param(xBase, default=xMax, dt=5, field=cField, prompt='Maximum East:',  uvalue='xMax', xs=17, /auto)
-    yBase      = widget_base(subBase, /column)
-    dummy      = widget_param(yBase, default=yMin, dt=5, field=cField, prompt='Minimum North:', uvalue='yMin', xs=17, /auto)
-    dummy      = widget_param(yBase, default=yMax, dt=5, field=cField, prompt='Maximum North:', uvalue='yMax', xs=17, /auto)
-
-    dummy      = widget_map(leftBase, default_map=[0,0], default_proj=defProj, uvalue='proj', /auto_manage)
-
-    rightBase  = widget_base(topBase)
-    dummy      = widget_multi(rightBase, list=productList, prompt='Select products:', /no_range, ysize=400, $
-                              default=prodIndex, uvalue='products', /auto)
-
-result = auto_wid_mng(gridBase)
-if (result.accept eq 0) then return
-
-retNum    = result.returns + 1
-grid      = result.grid
-noData    = float(result.noData)
-projInfo  = result.proj
-doInterp  = result.inside[0]
-prodIndex = result.products
-doMask    = result.mask[0]
-doMosaic  = result.mosaic[0]
-doOutlier = result.outlier[0]
-
-if nFiles eq 1 then doMosaic = 1
+; if nFiles eq 1 then doMosaic = 1 ; jj This line was in here but seems to be a bad idea
 
 if noData eq -999 then seeThru = float(-998) $
                   else seeThru = float(-999)
 
 if doMosaic eq 0 then seeThru = noData
 
-    ; Set the min and max values to the user specifications, and determine the dimensions of the
-    ; output raster.  Make sure the ranges are an integer number of pixels.
-
-xMin = result.xMin
-yMin = result.yMin
-
-mDim = ceil((result.xMax - xMin) / grid)
-nDim = ceil((result.yMax - yMin) / grid)
-
-xMax = xMin + mDim * grid
-yMax = yMin + nDim * grid
-
-    ; Create the list of product names
-
+; Create the list of product names
 bNames = productList[where(prodIndex eq 1)]
 nBands = total(prodIndex)
 
-    ; Create containers that will hold boundary objects of areas already completed and of
-    ; masked regions
+; Create containers that will hold boundary objects of areas already completed and of
+; masked regions
 
 oBounds = Obj_New('IDLanROIGroup')
 oMasks  = Obj_New('IDLanROIGroup')
 
-    ; If requested, get the mask vector file(s).  Read them and add to a single container object.
+; Set the temporary directory
+tempDir = getenv('IDL_TMPDIR')
 
-if doMask then begin
-
-    maskFiles = dialog_pickfile(title='Select mask file(s)', filter='*.evf', /multiple_files, /path)
-    if (maskFiles[0] eq '') then begin
-        doMask = 0
-        return
-    endif
-
-    nMask = n_elements(maskFiles)
-
-    for v=0,nMask-1 do begin
-
-        maskID = envi_evf_open(maskFiles[v])
-        envi_evf_info, maskID, num_recs=nRecs
-
-        for w=0,nRecs-1 do begin
-
-            maskCoords = envi_evf_read_record(maskID, w)
-            oMasks->Add, Obj_New('IDLanROI', maskCoords)
-
-        endfor
-
-        envi_evf_close, maskID
-
-    endfor
-
-endif
-
-    ; Record the user-determined filename or directory for the output product
-
-if doMosaic then begin
-
-    outputBase = widget_auto_base(title='Raster Output')
-    outputName = widget_outfm(outputBase, default='raster', prompt='Enter name of output raster file', uvalue='out', /auto)
-
-    result = auto_wid_mng(outputBase)
-    if (result.accept eq 0) then return
-
-    outMemory  = result.out.in_memory
-    outputFile = result.out.name
-
-        ; Set the temporary directory
-
-    tempDir = getenv('IDL_TMPDIR')
-
-endif else begin
-
-        ; Set the output directory
-
-    tempDir = dialog_pickfile(title='Select output directory', /directory, /path)
-    if (tempDir eq '') then return
-
-endelse
-
-    ; Determine how many individual lidar points are needed (per pixel)
-    ; for the various products.
+; Determine how many individual lidar points are needed (per pixel)
+; for the various products.
 
 needOne   = 0
 needTwo   = 0
@@ -367,33 +323,29 @@ endfor
 if products.fullSlope.doIt or products.fullAspect.doIt or products.locRough.doIt then needFull = 1 else needFull = 0
 if products.bareSlope.doIt or products.bareAspect.doIt                           then needBare = 1 else needBare = 0
 
-    ; Begin processing the data, file by file
-
+; Begin processing the data, file by file
 for b=0,nFiles-1 do begin
 
-        ; Read the lidar file header and determine if the file data falls
-        ; within the user-specified area.  If so, proceed.
-
+    ; Read the lidar file header and determine if the file data falls
+    ; within the user-specified area.  If so, proceed.
     ReadLAS_BCAL, inputFiles[b], header, /nodata
 
     if header.xMin le xMax and header.xMax ge xMin and $
        header.yMin le yMax and header.yMax ge yMin then begin
 
-            ; Establish the status reporting widget.  This will report the processing status
-            ; for each data file.
+        ; Establish the status reporting widget.  This will report the processing status
+        ; for each data fil
 
-        statBase = widget_auto_base(title='Rasterization')
         statText = ['Rasterization Progress: ', file_basename(inputFiles[b]), $
                     'File' + strcompress(b+1) + ' of' + strcompress(n_elements(inputFiles))]
-        envi_report_init, statText, base=statBase, /interrupt, title='Rasterization'
+        print, statText
 
-            ; Read the data file.
-
+        ; Read the data file.
         ReadLAS_BCAL, inputFiles[b], header, pData
 
-            ; Determine the data file's extents and dimensions with respect to those
-            ; of the output raster.  This ensures that the pixels of the data tile line up
-            ; with those of the final output raster.
+        ; Determine the data file's extents and dimensions with respect to those
+        ; of the output raster.  This ensures that the pixels of the data tile line up
+        ; with those of the final output raster.
 
         xMinTile = header.xMin - ((header.xMin - xMin) mod grid)
         yMinTile = header.yMin - ((header.yMin - yMin) mod grid)
@@ -479,8 +431,6 @@ for b=0,nFiles-1 do begin
 
         xCenter = (dindgen(iDim) + 0.5) * grid + xMinTile
         yCenter = (dindgen(jDim) + 0.5) * grid + yMinTile
-
-        envi_report_inc,  statBase, jDim
 
         for j=0,jDim-1 do begin
 
@@ -621,7 +571,7 @@ for b=0,nFiles-1 do begin
                 if needThree then begin
 
                         ; If interpolation is necessary and not enough data points lie within the pixel,
-                        ; use GetIndex_BCAL to find additional surrounding data points.  (GetIndex_BCAL is iterative.)
+                        ; use GetIndex_BCAL to find additional surrounding data points.  (GetIndex_BCAL is iterativ)
 
                     while (doInterp and (n_elements(index) lt 6)) do index = GetIndex_BCAL(i,j,iDim,jDim,arrayIndex,++factor)
 
@@ -677,7 +627,7 @@ for b=0,nFiles-1 do begin
                                                         const=fullConst, status=fullStat)
 
                             ; If interpolation is required and the slope calculation has not converged,
-                            ; use GetIndex_BCAL to find additional points and recalculate. Iterate until the
+                            ; use GetIndex_BCAL to find additional points and recalculat Iterate until the
                             ; slope calculation converges.
 
                         while (doInterp and ((fullStat gt 0) or (min(finite(fullSlope)) eq 0))) do begin
@@ -722,16 +672,6 @@ for b=0,nFiles-1 do begin
 
         endfor
 
-            ; Update the progress bar.
-
-        envi_report_stat, statBase, j, jDim, cancel=cancel
-        if cancel then begin
-            envi_report_init, base=statBase, /finish
-            Obj_Destroy, oBounds
-            Obj_Destroy, oMasks
-            return
-        endif
-
         endfor
 
             ; Cleanup after rasters are finished.
@@ -741,12 +681,11 @@ for b=0,nFiles-1 do begin
 
         pData = [0]
 
-            ; Create the map projection
+        ; Create the map projection
+        if georef eq 0 then mapInfo = envi_map_info_create(/ARBITRARY, ps=[grid,grid], mc=[0,0,xMinTile,yMaxTile]) $
+          else mapInfo = envi_map_info_create(proj=projInfo, ps=[grid,grid], mc=[0,0,xMinTile,yMaxTile])
 
-        mapInfo = envi_map_info_create(proj=projInfo.proj, ps=[grid,grid], mc=[0,0,xMinTile,yMaxTile])
-
-            ; Record the raster products to an ENVI file in the temporary directory
-
+        ; Record the raster products to an ENVI file in the temporary directory
         tempName = tempDir + file_basename(inputFiles[b], '.las')
 
         envi_write_envi_file, dataArray, $
@@ -767,18 +706,14 @@ for b=0,nFiles-1 do begin
             yLoc = [yLoc,(nShift > 0)]
         endelse
 
-        envi_report_init, base=statBase, /finish
-
     endif
 
 endfor
 
-    ; If mosaicking was requested, begin
+;if doMosaic then begin
+if 1 then begin
 
-if doMosaic then begin
-
-        ; Open the temporary files
-
+    ; Open the temporary files
     nTemp = n_elements(tempFiles)
     for g=0,nTemp-1 do begin
 
@@ -787,18 +722,14 @@ if doMosaic then begin
 
     endfor
 
-        ; Mosaic the temporary tiles together and save to the output file
-
+    ; Mosaic the temporary tiles together and save to the output file
     pos = rebin(lindgen(nBands),nBands,nTemp)
-
-    mapInfo = envi_map_info_create(proj=projInfo.proj, ps=[grid,grid], mc=[0,0,xMin,yMax])
-
-    envi_doit, 'mosaic_doit', background=noData, dims=dims, fid=fid, /georef, in_memory=outMemory, map_info=mapInfo, $
+    mapInfo = envi_map_info_create(proj=projInfo, ps=[grid,grid], mc=[0,0,xMin,yMax])
+    envi_doit, 'mosaic_doit', /INVISIBLE, /NO_REALIZE, background=noData, dims=dims, fid=fid, GEOREF=georef, map_info=mapInfo, $
         out_bname=bNames, out_dt=4, out_name=outputFile, pixel_size=[1,1], pos=pos, see_through_val=fltarr(nTemp)+seeThru, $
         use_see_through=intarr(nTemp)+1, x0=xLoc, y0=yLoc, xsize=mDim, ysize=nDim
 
         ; Close and erase the temporary files
-
     for h=0,nTemp-1 do envi_file_mng, id=fid[h], /remove, /delete
 
 endif
@@ -808,9 +739,4 @@ Obj_Destroy, oBounds
 
 tempFiles = [0]
 
-;print, systime(/seconds) - start
-
-
 end
-
-;kill routine
