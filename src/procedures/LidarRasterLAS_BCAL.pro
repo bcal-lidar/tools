@@ -98,7 +98,7 @@
 
 ; Begin main program
 
-pro LidarRasterLAS_BCAL, INPUTFILES=inputFiles, OUTPUTFILE=outputFile, MASKFILES=maskFiles, RETNUM=retNum, GRID=grid, NODATA=noData, DOOUTLIER=doOutlier, DOINTERP=doInterp, XMIN=userXMin, XMAX=userXMax, YMIN=userYMin, YMAX=userYMax   
+pro LidarRasterLAS_BCAL, INPUTFILES=inputFiles, OUTPUTFILE=outputFile, MASKFILES=maskFiles, RETNUM=retNum, GRID=grid, NODATA=noData, DOOUTLIER=doOutlier, DOINTERP=doInterp, XMIN=userXMin, XMAX=userXMax, YMIN=userYMin, YMAX=userYMax, PRODUCTSTRINGS=productStrings   
 
 COMPILE_OPT IDL2
 
@@ -106,6 +106,32 @@ ENVI, /RESTORE_BASE_SAVE_FILES
 ENVI_BATCH_INIT, /NO_STATUS_WINDOW
 
 args = COMMAND_LINE_ARGS(COUNT=argc)
+
+
+if N_ELEMENTS(doOutlier) eq 0 then doOutlier = 0
+products = {maxElev    :{title:'Maximum Elevation',                  points:1, index:-1, doIt:0}, $
+  minElev    :{title:'Minimum Elevation',                  points:1, index:-1, doIt:0}, $
+  meanElev   :{title:'Mean Elevation',                     points:1, index:-1, doIt:0}, $
+  fullSlope  :{title:'Slope (degrees)',                    points:3, index:-1, doIt:0}, $
+  fullAspect :{title:'Aspect (degrees from N)',            points:3, index:-1, doIt:0}, $
+  fullRough  :{title:'Absolute Roughness',                 points:2, index:-1, doIt:0}, $
+  locRough   :{title:'Local Roughness',                    points:3, index:-1, doIt:0}, $
+  inten      :{title:'Intensity',                          points:1, index:-1, doIt:0}, $
+  density    :{title:'Point Density',                      points:1, index:-1, doIt:0}, $
+  bareElev   :{title:'Bare Earth Elevation',               points:1, index:-1, doIt:0}, $
+  bareSlope  :{title:'Bare Earth Slope (degrees)',         points:3, index:-1, doIt:0}, $
+  bareAspect :{title:'Bare Earth Aspect (degrees from N)', points:3, index:-1, doIt:0}, $
+  meanVeg    :{title:'Mean Vegetation Height',             points:1, index:-1, doIt:0}, $
+  maxVeg     :{title:'Max Vegetation Height',              points:1, index:-1, doIt:0}, $
+  vegRough   :{title:'Vegetation Roughness',               points:2, index:-1, doIt:0}, $
+  bareDen    :{title:'Ground Point Density',               points:1, index:-1, doIt:0}}
+
+nBare        = 9
+nProducts    = n_tags(products)
+productList  = strarr(nProducts)
+prodIndex    = bytarr(nProducts)
+tnames = TAG_NAMES(products)
+for f=0,nProducts-1 do productList[f] = products.(f).title
 
 if argc gt 0 then begin
   foreach arg, args do begin
@@ -125,14 +151,24 @@ if argc gt 0 then begin
           'XMAX' : userXMax = float(kwParts[1])
           'YMIN' : userYMin = float(kwParts[1])
           'YMAX' : userYMax = float(kwParts[1])
-          
           else: ; Unknown
         endcase
       end
-      else: ; Unknown
+      else : begin
+        tindex = WHERE(STRCMP(tnames, strupcase( strcompress(arg, /REMOVE_ALL) )) EQ 1) 
+        if tindex ne -1 then prodIndex[tindex] = 1 $ ; Add to the to do list for products
+        else print, ['Parameter not recognized: ' + arg]         
+      endelse
     endcase
   endforeach
 endif
+
+for i=0, N_ELEMENTS(productStrings) - 1 do begin 
+  tindex = WHERE(STRCMP(tnames, productStrings[i]) EQ 1)
+  if tindex ne -1 then prodIndex[tindex] = 1 $; Add to the to do list for products
+  else print, ['Product not recognized: ' + productStrings[i]]
+endfor
+if total(prodIndex) eq 0 then prodIndex[0] = 1
 
 if N_ELEMENTS(maskFiles) eq 0 then doMask = 0 $
   else doMask = 1
@@ -168,7 +204,7 @@ if theError ne 0 then begin
     return
 endif
 
-; Get the input file(s)
+; todo: Get the input file(s)
 
 ; Gotta figure out how to do multiple files
 ;inputFiles is string array of canonical filenames
@@ -246,31 +282,6 @@ nDim = ceil((yMax - yMin) / grid)
 xMax = xMin + mDim * grid
 yMax = yMin + nDim * grid
 
-; todo: Command line
-products = {maxElev    :{title:'Maximum Elevation',                  points:1, index:-1, doIt:0}, $
-            minElev    :{title:'Minimum Elevation',                  points:1, index:-1, doIt:0}, $
-            meanElev   :{title:'Mean Elevation',                     points:1, index:-1, doIt:0}, $
-            fullSlope  :{title:'Slope (degrees)',                    points:3, index:-1, doIt:0}, $
-            fullAspect :{title:'Aspect (degrees from N)',            points:3, index:-1, doIt:0}, $
-            fullRough  :{title:'Absolute Roughness',                 points:2, index:-1, doIt:0}, $
-            locRough   :{title:'Local Roughness',                    points:3, index:-1, doIt:0}, $
-            inten      :{title:'Intensity',                          points:1, index:-1, doIt:0}, $
-            density    :{title:'Point Density',                      points:1, index:-1, doIt:0}, $
-            bareElev   :{title:'Bare Earth Elevation',               points:1, index:-1, doIt:0}, $
-            bareSlope  :{title:'Bare Earth Slope (degrees)',         points:3, index:-1, doIt:0}, $
-            bareAspect :{title:'Bare Earth Aspect (degrees from N)', points:3, index:-1, doIt:0}, $
-            meanVeg    :{title:'Mean Vegetation Height',             points:1, index:-1, doIt:0}, $
-            maxVeg     :{title:'Max Vegetation Height',              points:1, index:-1, doIt:0}, $
-            vegRough   :{title:'Vegetation Roughness',               points:2, index:-1, doIt:0}, $
-            bareDen    :{title:'Ground Point Density',               points:1, index:-1, doIt:0}}
-
-nBare        = 9
-nProducts    = n_tags(products)
-productList  = strarr(nProducts)
-prodIndex    = bytarr(nProducts)
-prodIndex[0] = 1
-for f=0,nProducts-1 do productList[f] = products.(f).title
-
 if nFiles eq 1 then doMosaic = [0] else doMosaic = [1]
 
 
@@ -288,6 +299,8 @@ if doMosaic eq 0 then seeThru = noData
 ; Create the list of product names
 bNames = productList[where(prodIndex eq 1)]
 nBands = total(prodIndex)
+
+print, ['Output will have' + strcompress(uint(nBands)) + ' bands']
 
 ; Create containers that will hold boundary objects of areas already completed and of
 ; masked regions
@@ -332,10 +345,7 @@ for b=0,nFiles-1 do begin
 
     if header.xMin le xMax and header.xMax ge xMin and $
        header.yMin le yMax and header.yMax ge yMin then begin
-
-        ; Establish the status reporting widget.  This will report the processing status
-        ; for each data fil
-
+      
         statText = ['Rasterization Progress: ', file_basename(inputFiles[b]), $
                     'File' + strcompress(b+1) + ' of' + strcompress(n_elements(inputFiles))]
         print, statText
