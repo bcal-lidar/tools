@@ -15,24 +15,62 @@
 ;
 ; PRODUCTS:
 ;
-;       Maximum Elevation       - The maximum elevation point within each pixel
-;       Minimum Elevation       - The minimum elevation point within each pixel
-;       Mean Elevation          - The mean of all elevation points within each pixel
-;       Slope                   - The average slope of all points within each pixel
-;       Aspect                  - The aspect of the average slope of all points within each pixel
-;       Absolute Roughness      - The roughness (standard deviation) of all elevation points within each pixel
-;       Local Roughness         - The roughness (standard deviation) of all elevation points within each pixel
-;                                 after the local slope has been removed (de-trended)
-;       Intensity               - The mean intensity of all points within each pixel
-;       Point Density           - The density of points (per square meter) within the pixel
-;       Bare Earth Elevation    - The minimum bare earth elevation (data elevation minus vegetation height)
-;                                 point within each pixel
-;       Bare Earth Slope        - The average slope of all bare earth elevation points within each pixel
-;       Bare Earth Aspect       - The aspect of the average slope of all bare earth elevation points within each pixel
-;       Mean Vegetation Height  - The mean of all height points within each pixel
-;       Max Vegetation Height   - The maximum of all height points within each pixel
-;       Vegetation Roughness    - The roughness (standard deviation) of all height points within each pixel
-;       Ground Point Density    - The density of ground points (per square meter) within the pixel
+;       Maximum Elevation (MAXELEV)     - The maximum elevation point within each pixel
+;       Minimum Elevation (MINELEV)     - The minimum elevation point within each pixel
+;       Mean Elevation (MEANELEV)       - The mean of all elevation points within each pixel
+;       Slope (FULLSLOPE)               - The average slope of all points within each pixel
+;       Aspect (FULLASPECT)             - The aspect of the average slope of all points within each pixel
+;       Absolute Roughness (FULLROUGH)  - The roughness (standard deviation) of all elevation points within each pixel
+;       Local Roughness (LOCROUGH)      - The roughness (standard deviation) of all elevation points within each pixel after the local slope has been removed (de-trended)
+;       Intensity (INTEN)               - The mean intensity of all points within each pixel
+;       Point Density (DENSITY)         - The density of points (per square meter) within the pixel
+;       Bare Earth Elevation (BAREELEV) - The minimum bare earth elevation (data elevation minus vegetation height) point within each pixel
+;       Bare Earth Slope (BARESLOPE)    - The average slope of all bare earth elevation points within each pixel
+;       Bare Earth Aspect (BAREASPECT)  - The aspect of the average slope of all bare earth elevation points within each pixel
+;       Mean Vegetation Ht (MEANVEG)    - The mean of all height points within each pixel
+;       Max Vegetation Ht (MAXVEG)      - The maximum of all height points within each pixel
+;       Vegetation Roughness (VEGROUGH) - The roughness (standard deviation) of all height points within each pixel
+;       Ground Point Density (BAREDEN)  - The density of ground points (per square meter) within the pixel
+;
+; PARAMETERS:
+;       INPUTFILES                - An array of canonical input file strings, ie 'c:\data\test.las' -OR- ['c:\data\test1.las', 'c:\data\test2.las']
+;       OUTPUTFILE                - A canonical file string, ie 'c:\data\test.tif'
+;       MASKFILES  --UNTESTED--   - An array of canonical mask file strings, ie 'c:\data\test.evf' -OR- ['c:\data\test1.evf', 'c:\data\test2.evf']
+;       RETNUM                    - Return to use: 1 = first, 2 = last, 3 = all returns (default 2)
+;       GRID                      - Grid dimension in input file's reference units (default 5.0)
+;       NODATA                    - Placeholder value for cells with no data in output (default -1)
+;       DOOUTLIER                 - Include values more than 5 stds from mean in the cell (default true)
+;       DOINTERP                  - Interpolate where there aren't enough points for product (default true)
+;       XMIN, XMAX, YMIN, YMAX    - Limits for raster output in input file projection units.  Defaults to and is cropped to extents of input file.
+;       PRODUCTSTRINGS            - Desired output products as an array of strings using the shorthand in parentheses above.  (default 'MAXELEV').  Example: 'MAXELEV' -OR- ['MAXELEV', 'MINELEV'] 
+;
+; EXAMPLE:
+;       1) LidarRasterLAS_BCAL, INPUTFILE='c:\data\test.las', OUTPUTFILE='c:\data\test.tif'
+;       2) LidarRasterLAS_BCAL, INPUTFILE=['c:\data\test1.las', 'c:\data\test2.las'], OUTPUTFILE='c:\data\test.tif', productStrings=['MAXELEV', 'MINELEV']
+;       3) LidarRasterLAS_BCAL, INPUTFILE='c:\data\test.las', OUTPUTFILE='c:\data\test.tif', productStrings=['MAXELEV', 'MINELEV'], DOOUTLIER=1, DOINTERP=0, GRID=3.0
+;
+; COMMAND LINE PARAMETERS:
+;       Values are the same as listed in PARAMETERS above when "same" is shown.  Command 
+;       line parameters are passed to the VM using -args followed by whitespace-separated 
+;       parameters.  PRODUCTSTRINGS parameters are listed as presence-based flags, while 
+;       the other parameters use the name/value pair separated by an equals sign.  All are
+;       surrounded by double quotes in Windows, e.g. -args "RETNUM=2" "MINELEV" 
+;       
+;       INPUTFILES                - A comma-separated list of input files, ie "INPUTFILES=c:\data\test.las" -OR- "INPUTFILES=c:\data\test1.las,c:\data\test2.las"
+;       OUTPUTFILE                - same
+;       MASKFILES  --UNTESTED--   - A comma-separated list of input files, ie "MASKFILES=c:\data\test.evf" -OR- "MASKFILES=c:\data\test1.evf,c:\data\test2.evf"
+;       RETNUM                    - same
+;       GRID                      - same
+;       NODATA                    - same
+;       DOOUTLIER                 - same
+;       DOINTERP                  - same
+;       XMIN, XMAX, YMIN, YMAX    - same
+;       PRODUCSTRINGS             - Any from the list of products using the shorthand above.  Example: "MAXELEV" -OR- "MAXELEV" "MINELEV"
+;
+; COMMAND LINE EXAMPLE:
+;       1) "Program Files\Exelis\IDL83\bin\bin.x86_64\idlrt.exe" -vm=c:\Projects\tools\LidarRasterLAS_BCAL.sav -args "INPUTFILES=c:\data\test.las" "OUTPUTFILE=c:\data\test.tif" "MINELEV" "MAXELEV"
+;       2) "Program Files\Exelis\IDL83\bin\bin.x86_64\idlrt.exe" -vm=c:\Projects\tools\LidarRasterLAS_BCAL.sav -args "INPUTFILES=c:\data\test1.las,c:\data\test2.las" "OUTPUTFILE=c:\data\test.tif" "DOOUTLIER=1"
+; 
 ;
 ; AUTHOR:
 ;
@@ -42,13 +80,6 @@
 ;       322 E. Front St., Ste. 240
 ;       Boise, ID  83702
 ;       http://geology.isu.edu/BCAL
-;
-; DEPENDENCIES:
-;
-;       ReadLAS_BCAL.pro
-;       GetBounds_BCAL.pro
-;       GetIndex_BCAL.pro
-;       ScalePoly_BCAL.pro
 ;
 ; KNOWN ISSUES:
 ;
@@ -62,6 +93,7 @@
 ;       Fixed mosaicking bug, November 2006
 ;       Added outlier removal, November 2006
 ;       Added embedded projection support, June 2007
+;       Parameterized, removed GUI, and added command line support, August 2015, Josh Johnston
 ;
 ;###########################################################################
 ;
@@ -81,12 +113,12 @@
 ; redistribute it freely, subject to the following restrictions:
 ;
 ; 1. The origin of this software must not be misrepresented; you must
-;    not claim you wrote the original softwar If you use this software
+;    not claim you wrote the original software. If you use this software
 ;    in a product, an acknowledgment in the product documentation
 ;    would be appreciated, but is not required.
 ;
 ; 2. Altered source versions must be plainly marked as such, and must
-;    not be misrepresented as being the original softwar
+;    not be misrepresented as being the original software.
 ;
 ; 3. This notice may not be removed or altered from any source distribution.
 ;
@@ -139,9 +171,15 @@ if argc gt 0 then begin
       1 : begin
         kwParts = strsplit( arg, '=', /EXTRAC)
         case strupcase( strcompress (kwParts[0], /REMOVE_ALL ) ) of
-          'INPUTFILES' : inputFiles = STRTRIM( kwParts[1], 2 )
+          'INPUTFILES' : begin
+            inputFileString = STRTRIM( kwParts[1], 2 )
+            inputFiles = strsplit(inputFileString, ',', /EXTRACT)
+          end
           'OUTPUTFILE' : outputFile = STRTRIM( kwParts[1], 2 )
-          'MASKFILES' : maskFiles = STRTRIM( kwParts[1], 2 )
+          'MASKFILES' : begin
+            maskFileString = STRTRIM( kwParts[1], 2 )
+            maskFiles = strsplit(maskFileString, ',', /EXTRACT)
+          end
           'RETNUM' : retNum = fix(kwParts[1])
           'GRID' : grid = float(kwParts[1])
           'NODATA' : noData = float(kwParts[1])
@@ -173,8 +211,9 @@ if total(prodIndex) eq 0 then prodIndex[0] = 1
 if N_ELEMENTS(maskFiles) eq 0 then doMask = 0 $
   else doMask = 1
 
-if N_ELEMENTS(retNum) eq 0 then retNum = 3 ; jj: I think 1 is first, 2 is last, and 3 is both
 nReturns = 2
+if N_ELEMENTS(retNum) eq 0 then retNum = 2 ; jj: I think 1 is first, 2 is last, and 3 is both.  Default to last
+
 if N_ELEMENTS(grid) eq 0 then grid = 5.0
 if N_ELEMENTS(noData) eq 0 then noData = -1
 if N_ELEMENTS(doOutlier) eq 0 then doOutlier = 0
@@ -204,19 +243,14 @@ if theError ne 0 then begin
     return
 endif
 
-; todo: Get the input file(s)
-
-; Gotta figure out how to do multiple files
 ;inputFiles is string array of canonical filenames
-nFiles = 1
+nFiles = n_elements(inputFiles)
 
 
-;todo: if maskFile present but not doMask then doMask default to true
 ;maskFiles is string array of canonical filenames
-;maskFiles = dialog_pickfile(title='Select mask file(s)', filter='*.evf', /multiple_files, /path)
 ; If requested, get the mask vector file(s).  Read them and add to a single container object.
-if doMask then begin
 
+if doMask ne 0 then begin
   if (maskFiles[0] eq '') then begin
     doMask = 0
     return
