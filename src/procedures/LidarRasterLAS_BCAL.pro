@@ -42,7 +42,8 @@
 ;       DOOUTLIER                 - Include values more than 5 stds from mean in the cell (default true)
 ;       DOINTERP                  - Interpolate where there aren't enough points for product (default true)
 ;       XMIN, XMAX, YMIN, YMAX    - Limits for raster output in input file projection units.  Defaults to and is cropped to extents of input file.
-;       PRODUCTSTRINGS            - Desired output products as an array of strings using the shorthand in parentheses above.  (default 'MAXELEV').  Example: 'MAXELEV' -OR- ['MAXELEV', 'MINELEV'] 
+;       PRODUCTSTRINGS            - Desired output products as an array of strings using the shorthand in parentheses above.  (default 'MAXELEV').  Example: 'MAXELEV' -OR- ['MAXELEV', 'MINELEV']
+;       PROJ   --UNTESTED--       - A projection to use for output.  Default is projection in INPUTFILE. 
 ;
 ; EXAMPLE:
 ;       1) LidarRasterLAS_BCAL, INPUTFILE='c:\data\test.las', OUTPUTFILE='c:\data\test.tif'
@@ -66,6 +67,7 @@
 ;       DOINTERP                  - same
 ;       XMIN, XMAX, YMIN, YMAX    - same
 ;       PRODUCSTRINGS             - Any from the list of products using the shorthand above.  Example: "MAXELEV" -OR- "MAXELEV" "MINELEV"
+;       PROJ                      - Not supported from command line.  Defaults to projection in INPUTFILE.
 ;
 ; COMMAND LINE EXAMPLE:
 ;       1) "Program Files\Exelis\IDL83\bin\bin.x86_64\idlrt.exe" -vm=c:\Projects\tools\LidarRasterLAS_BCAL.sav -args "INPUTFILES=c:\data\test.las" "OUTPUTFILE=c:\data\test.tif" "MINELEV" "MAXELEV"
@@ -102,7 +104,7 @@
 ; This software is OSI Certified Open Source Software.
 ; OSI Certified is a certification mark of the Open Source Initiative.
 ;
-; Copyright � 2006 David Streutker, Idaho State University.
+; Copyright 2015 Boise State University.
 ;
 ; This software is provided "as-is", without any express or
 ; implied warranty. In no event will the authors be held liable
@@ -130,7 +132,7 @@
 
 ; Begin main program
 
-pro LidarRasterLAS_BCAL, INPUTFILES=inputFiles, OUTPUTFILE=outputFile, MASKFILES=maskFiles, RETNUM=retNum, GRID=grid, NODATA=noData, DOOUTLIER=doOutlier, DOINTERP=doInterp, XMIN=userXMin, XMAX=userXMax, YMIN=userYMin, YMAX=userYMax, PRODUCTSTRINGS=productStrings   
+pro LidarRasterLAS_BCAL, INPUTFILES=inputFiles, OUTPUTFILE=outputFile, MASKFILES=maskFiles, RETNUM=retNum, GRID=grid, NODATA=noData, DOOUTLIER=doOutlier, DOINTERP=doInterp, XMIN=userXMin, XMAX=userXMax, YMIN=userYMin, YMAX=userYMax, PRODUCTSTRINGS=productStrings, PROJ=proj   
 
 COMPILE_OPT IDL2
 
@@ -138,9 +140,8 @@ ENVI, /RESTORE_BASE_SAVE_FILES
 ENVI_BATCH_INIT, /NO_STATUS_WINDOW
 
 args = COMMAND_LINE_ARGS(COUNT=argc)
+;if n_elements(args) ne 0 then ENVI_BATCH_INIT, /NO_STATUS_WINDOW
 
-
-if N_ELEMENTS(doOutlier) eq 0 then doOutlier = 0
 products = {maxElev    :{title:'Maximum Elevation',                  points:1, index:-1, doIt:0}, $
   minElev    :{title:'Minimum Elevation',                  points:1, index:-1, doIt:0}, $
   meanElev   :{title:'Mean Elevation',                     points:1, index:-1, doIt:0}, $
@@ -207,6 +208,8 @@ for i=0, N_ELEMENTS(productStrings) - 1 do begin
   else print, ['Product not recognized: ' + productStrings[i]]
 endfor
 if total(prodIndex) eq 0 then prodIndex[0] = 1
+
+if N_ELEMENTS(doOutlier) eq 0 then doOutlier = 0
 
 if N_ELEMENTS(maskFiles) eq 0 then doMask = 0 $
   else doMask = 1
@@ -298,10 +301,12 @@ for a=0,nFiles-1 do begin
 endfor
 
 ;if n_tags(defProj) eq 0 then defProj = envi_proj_create(DATUM='North America 1983', TYPE=2, PARAMS=11, NAME='UTM')
+; todo: Add output projection parameter
 if n_tags(defProj) eq 0 then begin
   defProj = envi_proj_create()
   georef = 0
 endif else georef = 1
+if N_ELEMENTS(proj) eq 0 then proj = defProj
  
 ; Default output max/min to the extents in input file(s), but use user values if present
 if N_ELEMENTS(userXMin) ne 0 then xMin = userXMin
@@ -317,11 +322,6 @@ xMax = xMin + mDim * grid
 yMax = yMin + nDim * grid
 
 if nFiles eq 1 then doMosaic = [0] else doMosaic = [1]
-
-
-; todo: Add output projection parameter
-projInfo  = defProj
-
 
 ; if nFiles eq 1 then doMosaic = 1 ; jj This line was in here but seems to be a bad idea
 
@@ -727,7 +727,7 @@ for b=0,nFiles-1 do begin
 
         ; Create the map projection
         if georef eq 0 then mapInfo = envi_map_info_create(/ARBITRARY, ps=[grid,grid], mc=[0,0,xMinTile,yMaxTile]) $
-          else mapInfo = envi_map_info_create(proj=projInfo, ps=[grid,grid], mc=[0,0,xMinTile,yMaxTile])
+          else mapInfo = envi_map_info_create(proj=proj, ps=[grid,grid], mc=[0,0,xMinTile,yMaxTile])
 
         ; Record the raster products to an ENVI file in the temporary directory
         tempName = tempDir + file_basename(inputFiles[b], '.las')
@@ -768,7 +768,7 @@ if 1 then begin
 
     ; Mosaic the temporary tiles together and save to the output file
     pos = rebin(lindgen(nBands),nBands,nTemp)
-    mapInfo = envi_map_info_create(proj=projInfo, ps=[grid,grid], mc=[0,0,xMin,yMax])
+    mapInfo = envi_map_info_create(proj=proj, ps=[grid,grid], mc=[0,0,xMin,yMax])
     envi_doit, 'mosaic_doit', /INVISIBLE, /NO_REALIZE, background=noData, dims=dims, fid=fid, GEOREF=georef, map_info=mapInfo, $
         out_bname=bNames, out_dt=4, out_name=outputFile, pixel_size=[1,1], pos=pos, see_through_val=fltarr(nTemp)+seeThru, $
         use_see_through=intarr(nTemp)+1, x0=xLoc, y0=yLoc, xsize=mDim, ysize=nDim
