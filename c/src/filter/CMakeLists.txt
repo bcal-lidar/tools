@@ -4,11 +4,10 @@
 
 cmake_minimum_required(VERSION 2.8.8)
 
-include_directories(filter)
+include_directories(${PROJECT_SOURCE_DIR}/src
+                    ${GDAL_INCLUDE_DIR})
+set(bcal_filter_src bcal_filter.c
+                    bcal_partition.c)
 
-add_subdirectory(filter)
+add_library(filter OBJECT ${bcal_filter_src})
 
-add_executable(bcal bcal.c
-               $<TARGET_OBJECTS:filter>)
-
-target_link_libraries(bcal ${GDAL_LIBRARY})
