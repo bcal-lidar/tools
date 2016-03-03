@@ -16,7 +16,7 @@ CPLErr bcal_partition( OGREnvelope *psEnv, uint32 nJobs, bcal_decomposition *d )
     }
     if( nJobs == 1 )
     {
-        d->envs = CPLMalloc( sizeof( OGREnvelope ) );
+        d->envs = malloc( sizeof( OGREnvelope ) );
         d->envs[0] = *psEnv;
         d->n = 1;
         return CE_None;
@@ -34,7 +34,7 @@ CPLErr bcal_partition( OGREnvelope *psEnv, uint32 nJobs, bcal_decomposition *d )
     dx = (psEnv->MaxX - psEnv->MinX) / (double)nEnv;
     dy = (psEnv->MaxY - psEnv->MinY) / (double)nEnv;
     CPLDebug( "BCAL", "using dx:%lf and dy:%lf to build grid", dx, dy );
-    d->envs = CPLMalloc( sizeof( OGREnvelope ) * nEnv * nEnv );
+    d->envs = malloc( sizeof( OGREnvelope ) * nEnv * nEnv );
     d->n = nEnv * nEnv;
     int i, j, k;
     for( i = 0; i < nEnv; i++ )
@@ -55,6 +55,6 @@ CPLErr bcal_partition( OGREnvelope *psEnv, uint32 nJobs, bcal_decomposition *d )
 
 void bcal_free_decomp( bcal_decomposition *d )
 {
-    CPLFree( d->envs );
+    free( d->envs );
     d->envs = NULL;
 }

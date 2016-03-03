@@ -3,6 +3,7 @@
 // license that can be found in the LICENSE file.
 
 #include "bcal_filter.h"
+#include "bcal_point.h"
 
 static void Usage()
 {
@@ -141,6 +142,64 @@ CPLErr bcal_filter( bcal_filter_data *b )
         GDALClose( hDS );
         return CE_Failure;
     }
+    /*
+    ** We could use fast feature count here, when spatial filter enabled.
+    ** Instead, we'll guess and keep track.
+    */
+    uint64 nGuess = OGR_L_GetFeatureCount( hLayer, FALSE ) / d.n;
+    int nAlloc = nGuess;
+    bcal_point **points;
+    points = malloc( sizeof( bcal_point* ) * d.n );
+    OGRGeometryH hPoly;
+    OGRGeometryH hRing;
+    OGRGeometryH hGeom;
+    OGRFeatureH hFeat;
+    uint32 i, j;
+    for( i = 0; i < d.n; i++ )
+    {
+        nAlloc = nGuess;
+        points[i] = malloc( sizeof( bcal_point ) * nAlloc );
+        hRing = OGR_G_CreateGeometry( wkbLinearRing );
+        hPoly = OGR_G_CreateGeometry( wkbPolygon );
+        OGR_G_SetPoint( hRing, 0, d.envs[i].MinX, d.envs[i].MaxY, 0 );
+        OGR_G_SetPoint( hRing, 1, d.envs[i].MaxX, d.envs[i].MaxY, 0 );
+        OGR_G_SetPoint( hRing, 2, d.envs[i].MinX, d.envs[i].MinY, 0 );
+        OGR_G_SetPoint( hRing, 3, d.envs[i].MaxX, d.envs[i].MinY, 0 );
+        OGR_G_CloseRings( hRing );
+        OGR_G_AddGeometry( hPoly, hRing );
+        OGR_L_ResetReading( hLayer );
+        OGR_L_SetSpatialFilter( hLayer, hPoly );
+        j = 0;
+        while( (hFeat = OGR_L_GetNextFeature( hLayer )) != NULL )
+        {
+            if( j >= nAlloc )
+            {
+                nAlloc = nAlloc * 1.5;
+                points[i] = realloc( points[i], sizeof( bcal_point ) * nAlloc );
+            }
+            points[i][j].fid = OGR_F_GetFID( hFeat );
+            points[i][j].c =
+                OGR_F_GetFieldAsInteger( hFeat, OGR_F_GetFieldIndex( hFeat, "classification" ) );
+            hGeom = OGR_F_GetGeometryRef( hFeat );
+            points[i][j].x = OGR_G_GetX( hGeom, 0 );
+            points[i][j].y = OGR_G_GetY( hGeom, 0 );
+            points[i][j].z = OGR_G_GetZ( hGeom, 0 );
+            OGR_F_Destroy( hFeat );
+            j++;
+        }
+        /* Free unused array stuff */
+        points[i] = realloc( points[i], sizeof( bcal_point ) * (j - 1) );
+        OGR_L_SetSpatialFilter( hLayer, NULL );
+        OGR_G_DestroyGeometry( hRing );
+        OGR_G_DestroyGeometry( hPoly );
+    }
+    for( i = 0; i < d.n; i++ )
+    {
+        free( points[i] );
+        points[i] = NULL;
+    }
+    free( points );
+    points = NULL;
 
     GDALClose( hDS );
     return CE_None;
