@@ -7,12 +7,12 @@
 int main()
 {
     OGREnvelope env;
-    env.MinX = 0.;
-    env.MaxX = 10.;
-    env.MinY = 0.;
-    env.MaxY = 10.;
-    bcal_decomposition d;
-    CPLErr e = bcal_partition( &env, 4, &d );
+    bcal_domain d;
+    d.env.MinX = 0.;
+    d.env.MaxX = 10.;
+    d.env.MinY = 0.;
+    d.env.MaxY = 10.;
+    CPLErr e = bcal_partition( &d, 4 );
     if( e != CE_None )
     {
         return 1;
@@ -21,10 +21,10 @@ int main()
     {
         return 1;
     }
-    if( !CPLIsEqual( d.envs[0].MinX, 0. ) ||
-        !CPLIsEqual( d.envs[0].MaxX, 5. ) ||
-        !CPLIsEqual( d.envs[0].MinY, 5. ) ||
-        !CPLIsEqual( d.envs[0].MaxY, 10. ) )
+    if( !CPLIsEqual( d.sub_envs[0].MinX, 0. ) ||
+        !CPLIsEqual( d.sub_envs[0].MaxX, 5. ) ||
+        !CPLIsEqual( d.sub_envs[0].MinY, 5. ) ||
+        !CPLIsEqual( d.sub_envs[0].MaxY, 10. ) )
     {
         return 1;
     }

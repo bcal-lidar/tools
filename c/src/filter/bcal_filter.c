@@ -112,8 +112,8 @@ CPLErr bcal_filter( bcal_filter_data *b )
         return CE_Failure;
     }
 
-    OGREnvelope sDomain;
-    if( OGR_L_GetExtent( hLayer, &sDomain, FALSE ) != OGRERR_NONE )
+    bcal_domain domain;
+    if( OGR_L_GetExtent( hLayer, &(domain.env), FALSE ) != OGRERR_NONE )
     {
         CPLError( CE_Failure, CPLE_AppDefined,
                   "Failed to obtain a valid domain boundary." );
@@ -121,9 +121,7 @@ CPLErr bcal_filter( bcal_filter_data *b )
         return CE_Failure;
     }
 
-    bcal_decomposition d;
-
-    eErr = bcal_partition( &sDomain, b->jobs, &d );
+    eErr = bcal_partition( &domain, b->jobs );
     if( eErr != CE_None )
     {
         CPLError( CE_Failure, CPLE_AppDefined,
@@ -135,26 +133,25 @@ CPLErr bcal_filter( bcal_filter_data *b )
     ** We could use fast feature count here, when spatial filter enabled.
     ** Instead, we'll guess and keep track.
     */
-    uint64 guess = OGR_L_GetFeatureCount( hLayer, FALSE ) / d.n;
+    uint64 guess = OGR_L_GetFeatureCount( hLayer, FALSE ) / domain.n;
     int alloced = guess;
-    bcal_point **points;
-    points = malloc( sizeof( bcal_point* ) * d.n );
-    uint32 *p_counts = malloc( sizeof( int ) * d.n );
+    bcal_working_set *set = malloc( sizeof( bcal_working_set ) * domain.n );
     OGRGeometryH hPoly;
     OGRGeometryH hRing;
     OGRGeometryH hGeom;
     OGRFeatureH hFeat;
     uint32 i, j;
-    for( i = 0; i < d.n; i++ )
+    for( i = 0; i < domain.n; i++ )
     {
         alloced = guess;
-        points[i] = malloc( sizeof( bcal_point ) * alloced );
+        set[i].p = malloc( sizeof( bcal_point ) * alloced );
+        set[i].env = domain.sub_envs[i];
         hRing = OGR_G_CreateGeometry( wkbLinearRing );
         hPoly = OGR_G_CreateGeometry( wkbPolygon );
-        OGR_G_SetPoint( hRing, 0, d.envs[i].MinX, d.envs[i].MaxY, 0 );
-        OGR_G_SetPoint( hRing, 1, d.envs[i].MaxX, d.envs[i].MaxY, 0 );
-        OGR_G_SetPoint( hRing, 2, d.envs[i].MinX, d.envs[i].MinY, 0 );
-        OGR_G_SetPoint( hRing, 3, d.envs[i].MaxX, d.envs[i].MinY, 0 );
+        OGR_G_SetPoint( hRing, 0, domain.sub_envs[i].MinX, domain.sub_envs[i].MaxY, 0 );
+        OGR_G_SetPoint( hRing, 1, domain.sub_envs[i].MaxX, domain.sub_envs[i].MaxY, 0 );
+        OGR_G_SetPoint( hRing, 2, domain.sub_envs[i].MinX, domain.sub_envs[i].MinY, 0 );
+        OGR_G_SetPoint( hRing, 3, domain.sub_envs[i].MaxX, domain.sub_envs[i].MinY, 0 );
         OGR_G_CloseRings( hRing );
         OGR_G_AddGeometry( hPoly, hRing );
         OGR_L_ResetReading( hLayer );
@@ -165,39 +162,38 @@ CPLErr bcal_filter( bcal_filter_data *b )
             if( j >= alloced )
             {
                 alloced = alloced * 1.5;
-                points[i] = realloc( points[i], sizeof( bcal_point ) * alloced );
+                set[i].p = realloc( set[i].p, sizeof( bcal_point ) * alloced );
             }
-            points[i][j].fid = OGR_F_GetFID( hFeat );
-            points[i][j].c =
+            set[i].p[j].fid = OGR_F_GetFID( hFeat );
+            set[i].p[j].c =
                 OGR_F_GetFieldAsInteger( hFeat, OGR_F_GetFieldIndex( hFeat, "classification" ) );
             hGeom = OGR_F_GetGeometryRef( hFeat );
-            points[i][j].x = OGR_G_GetX( hGeom, 0 );
-            points[i][j].y = OGR_G_GetY( hGeom, 0 );
-            points[i][j].z = OGR_G_GetZ( hGeom, 0 );
+            set[i].p[j].x = OGR_G_GetX( hGeom, 0 );
+            set[i].p[j].y = OGR_G_GetY( hGeom, 0 );
+            set[i].p[j].z = OGR_G_GetZ( hGeom, 0 );
             OGR_F_Destroy( hFeat );
             j++;
         }
         /* Free unused array stuff */
-        points[i] = realloc( points[i], sizeof( bcal_point ) * (j - 1) );
-        /* Keep track of how many points are in each bin */
-        p_counts[i] = j - 1;
+        set[i].p = realloc( set[i].p, sizeof( bcal_point ) * (j - 1) );
+        set[i].n = j - 1;
         OGR_L_SetSpatialFilter( hLayer, NULL );
         OGR_G_DestroyGeometry( hRing );
         OGR_G_DestroyGeometry( hPoly );
     }
     /* Thread over this loop */
-    for( i = 0; i < d.n; i++ )
+    for( i = 0; i < domain.n; i++ )
     {
         //bin( points[i], p_counts[i], b->spacing );
         //set_init_ground(
     }
-    for( i = 0; i < d.n; i++ )
+    for( i = 0; i < domain.n; i++ )
     {
-        free( points[i] );
-        points[i] = NULL;
+        free( set[i].p );
+        set[i].p = NULL;
     }
-    free( points );
-    points = NULL;
+    free( set );
+    set = NULL;
 
     GDALClose( hDS );
     return CE_None;

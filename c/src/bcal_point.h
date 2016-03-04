@@ -15,6 +15,9 @@ struct bcal_point
     double y;
     double z;
     uint8  c;
+    uint8  h;
+
+    uint32 bin;
 };
 
 #endif /* BCAL_POINT_H_ */
