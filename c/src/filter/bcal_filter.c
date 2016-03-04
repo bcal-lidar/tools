@@ -8,16 +8,13 @@
 static void Usage()
 {
     printf(
-"bcal filter [-jobs n] [-mem_limit n/all] [-buffer f]\n"
+"bcal filter [-jobs n] [-buffer f]\n"
 "            [grid_space f] input output\n"
 "\n"
 "   -jobs           how many parallel threads to run.\n"
-"   -mem_limit      how much estimated memory to use per job,\n"
-"                   all meaning don't buffer the work, just run\n"
-"                   the entire file over the jobs.\n"
 "   -buffer         when merging working tiles, use a buffer of f\n"
 "                   overlap.\n"
-"   -grid_space     estimated canopy spacing.\n"
+"   -grid_space     estimated canopy spacing, default 1.0\n"
 "   input           the input *.las or *.laz file\n"
 "   output          the output las file (laz writing not supported)\n" );
     exit( 1 );
@@ -26,11 +23,11 @@ static void Usage()
 int bcal_filter_app( int argc, char *argv[] )
 {
     int i = 0;
-    int nJobs = 1;
-    int nMemSize = 0;
-    double dfBufSize = 0;
-    const char *szInput;
-    const char *szOutput;
+    int jobs = 1;
+    double merge_buf = 0;
+    double spacing = 1.0;
+    const char *input = NULL;
+    const char *output = NULL;
     /* Absolute minimum is 4 arguments. bcal filter in out */
     if( argc < 4 )
     {
@@ -46,51 +43,43 @@ int bcal_filter_app( int argc, char *argv[] )
         }
         else if( strncmp( argv[i], "-jobs", strlen( "-jobs" ) ) == 0 && i + 1 < argc )
         {
-            nJobs = atoi( argv[++i] );
-        }
-        else if( strncmp( argv[i], "-mem_limit", strlen( "-mem_limit" ) ) == 0 && i + 1 < argc )
-        {
-            i++;
-            if( strncmp( argv[i], "all", strlen( "all" ) == 0 ) )
-            {
-                nMemSize = 0;
-            }
-            else
-            {
-                nMemSize = atoi( argv[i] );
-            }
+            jobs = atoi( argv[++i] );
         }
         else if( strncmp( argv[i], "-buffer", strlen( "-buffer" ) ) == 0 && i + 1 < argc )
         {
-            dfBufSize = atof( argv[++i] );
+            merge_buf = atof( argv[++i] );
         }
-        else if( szInput == NULL )
+        else if( strncmp( argv[i], "-grid_space", strlen( "-grid_space" ) ) == 0 && i + 1 < argc )
         {
-            szInput = argv[i];
+            spacing = atof( argv[++i] );
         }
-        else if( szOutput == NULL )
+        else if( input == NULL )
         {
-            szOutput = argv[i];
+            input = argv[i];
+        }
+        else if( output == NULL )
+        {
+            output = argv[i];
         }
         i++;
     }
-    if( szInput == NULL )
+    if( input == NULL )
     {
         fprintf( stderr, "No input specified\n" );
         exit( 1 );
     }
-    if( szOutput == NULL )
+    if( output == NULL )
     {
         fprintf( stderr, "No output specified\n" );
         exit( 1 );
     }
 
     bcal_filter_data b;
-    b.szInputFile = strdup( szInput );
-    b.szOutputFile = strdup( szOutput );
-    b.nJobs = nJobs;
-    b.nMemBufSize = nMemSize;
-    b.dfMergeBuffer = dfBufSize;
+    b.input = strdup( input );
+    b.output = strdup( output );
+    b.jobs = jobs;
+    b.merge_buf = merge_buf;
+    b.spacing = spacing;
 
     return (int)bcal_filter( &b );
 }
@@ -106,7 +95,7 @@ CPLErr bcal_filter( bcal_filter_data *b )
 
     CPLErr eErr = CE_None;
     GDALDatasetH hDS = NULL;
-    hDS = GDALOpenEx( b->szInputFile, GDAL_OF_VECTOR | GDAL_OF_READONLY,
+    hDS = GDALOpenEx( b->input, GDAL_OF_VECTOR | GDAL_OF_READONLY,
                         NULL, NULL, NULL );
     if( hDS == NULL )
     {
@@ -134,7 +123,7 @@ CPLErr bcal_filter( bcal_filter_data *b )
 
     bcal_decomposition d;
 
-    eErr = bcal_partition( &sDomain, b->nJobs, &d );
+    eErr = bcal_partition( &sDomain, b->jobs, &d );
     if( eErr != CE_None )
     {
         CPLError( CE_Failure, CPLE_AppDefined,
@@ -146,10 +135,11 @@ CPLErr bcal_filter( bcal_filter_data *b )
     ** We could use fast feature count here, when spatial filter enabled.
     ** Instead, we'll guess and keep track.
     */
-    uint64 nGuess = OGR_L_GetFeatureCount( hLayer, FALSE ) / d.n;
-    int nAlloc = nGuess;
+    uint64 guess = OGR_L_GetFeatureCount( hLayer, FALSE ) / d.n;
+    int alloced = guess;
     bcal_point **points;
     points = malloc( sizeof( bcal_point* ) * d.n );
+    uint32 *p_counts = malloc( sizeof( int ) * d.n );
     OGRGeometryH hPoly;
     OGRGeometryH hRing;
     OGRGeometryH hGeom;
@@ -157,8 +147,8 @@ CPLErr bcal_filter( bcal_filter_data *b )
     uint32 i, j;
     for( i = 0; i < d.n; i++ )
     {
-        nAlloc = nGuess;
-        points[i] = malloc( sizeof( bcal_point ) * nAlloc );
+        alloced = guess;
+        points[i] = malloc( sizeof( bcal_point ) * alloced );
         hRing = OGR_G_CreateGeometry( wkbLinearRing );
         hPoly = OGR_G_CreateGeometry( wkbPolygon );
         OGR_G_SetPoint( hRing, 0, d.envs[i].MinX, d.envs[i].MaxY, 0 );
@@ -172,10 +162,10 @@ CPLErr bcal_filter( bcal_filter_data *b )
         j = 0;
         while( (hFeat = OGR_L_GetNextFeature( hLayer )) != NULL )
         {
-            if( j >= nAlloc )
+            if( j >= alloced )
             {
-                nAlloc = nAlloc * 1.5;
-                points[i] = realloc( points[i], sizeof( bcal_point ) * nAlloc );
+                alloced = alloced * 1.5;
+                points[i] = realloc( points[i], sizeof( bcal_point ) * alloced );
             }
             points[i][j].fid = OGR_F_GetFID( hFeat );
             points[i][j].c =
@@ -189,9 +179,17 @@ CPLErr bcal_filter( bcal_filter_data *b )
         }
         /* Free unused array stuff */
         points[i] = realloc( points[i], sizeof( bcal_point ) * (j - 1) );
+        /* Keep track of how many points are in each bin */
+        p_counts[i] = j - 1;
         OGR_L_SetSpatialFilter( hLayer, NULL );
         OGR_G_DestroyGeometry( hRing );
         OGR_G_DestroyGeometry( hPoly );
+    }
+    /* Thread over this loop */
+    for( i = 0; i < d.n; i++ )
+    {
+        //bin( points[i], p_counts[i], b->spacing );
+        //set_init_ground(
     }
     for( i = 0; i < d.n; i++ )
     {

@@ -15,12 +15,11 @@
 
 typedef struct bcal_filter_data
 {
-    char *szInputFile;
-    char *szOutputFile;
-    int nJobs;
-    int nMemBufSize;
-    double dfMergeBuffer;
-    double dfGridSpacing;
+    char *input;
+    char *output;
+    int jobs;
+    double merge_buf;
+    double spacing;
 }bcal_filter_data;
 
 typedef struct bcal_decomposition
@@ -33,7 +32,7 @@ int bcal_filter_app( int argc, char *argv[] );
 
 CPLErr bcal_filter( bcal_filter_data *b);
 
-CPLErr bcal_partition( OGREnvelope *e, uint32 nMegaBytes, bcal_decomposition *d );
+CPLErr bcal_partition( OGREnvelope *e, uint32 jobs, bcal_decomposition *d );
 
 #endif /* BCAL_FILTER_H_ */
 

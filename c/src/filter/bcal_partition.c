@@ -8,38 +8,38 @@
 #include "gdal.h"
 #include "cpl_conv.h"
 
-CPLErr bcal_partition( OGREnvelope *psEnv, uint32 nJobs, bcal_decomposition *d )
+CPLErr bcal_partition( OGREnvelope *env, uint32 jobs, bcal_decomposition *d )
 {
-    if( psEnv == NULL || d == NULL )
+    if( env == NULL || d == NULL )
     {
         return CE_Failure;
     }
-    if( nJobs == 1 )
+    if( jobs == 1 )
     {
         d->envs = malloc( sizeof( OGREnvelope ) );
-        d->envs[0] = *psEnv;
+        d->envs[0] = *env;
         d->n = 1;
         return CE_None;
     }
-    uint32 nEnv = 0;
-    while( nEnv * nEnv < nJobs )
+    uint32 env_count = 0;
+    while( env_count * env_count < jobs )
     {
-        nEnv++;
+        env_count++;
     }
-    CPLDebug( "BCAL", "partitioning domain into %d fields", nEnv );
+    CPLDebug( "BCAL", "partitioning domain into %d fields", env_count );
     double x, y;
     double dx, dy;
-    x = psEnv->MinX;
-    y = psEnv->MaxY;
-    dx = (psEnv->MaxX - psEnv->MinX) / (double)nEnv;
-    dy = (psEnv->MaxY - psEnv->MinY) / (double)nEnv;
+    x = env->MinX;
+    y = env->MaxY;
+    dx = (env->MaxX - env->MinX) / (double)env_count;
+    dy = (env->MaxY - env->MinY) / (double)env_count;
     CPLDebug( "BCAL", "using dx:%lf and dy:%lf to build grid", dx, dy );
-    d->envs = malloc( sizeof( OGREnvelope ) * nEnv * nEnv );
-    d->n = nEnv * nEnv;
+    d->envs = malloc( sizeof( OGREnvelope ) * env_count * env_count );
+    d->n = env_count * env_count;
     int i, j, k;
-    for( i = 0; i < nEnv; i++ )
+    for( i = 0; i < env_count; i++ )
     {
-        for( j = 0; j < nEnv; j++ )
+        for( j = 0; j < env_count; j++ )
         {
             d->envs[i+j].MinX = x + dx * j;
             d->envs[i+j].MaxX = x + (dx * (j + 1));
