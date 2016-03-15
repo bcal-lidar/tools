@@ -4,8 +4,10 @@
 
 cmake_minimum_required(VERSION 2.8.8)
 
+include_directories(sqlite)
 include_directories(filter)
 
+add_subdirectory(sqlite)
 add_subdirectory(filter)
 
 add_executable(bcal bcal.c

@@ -8,8 +8,7 @@
 static void Usage()
 {
     printf(
-"bcal filter [-jobs n] [-buffer f]\n"
-"            [grid_space f] input output\n"
+"bcal filter [-jobs n] [-buffer f] [grid_space f] input output\n"
 "\n"
 "   -jobs           how many parallel threads to run.\n"
 "   -buffer         when merging working tiles, use a buffer of f\n"
