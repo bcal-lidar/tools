@@ -1,0 +1,95 @@
+BCAL Task: Update Lidar Opener to LAS 1.3 and 1.4. 
+
+LidarTools_BCAL\src\lib\ReadCommonHeaderLAS.pro: Create a common header
+structure, which is the common part in the headers of all LAS versions.
+
+InitHeaderLAS_BCAL.pro changed with input keywords and header12, header13, and
+head14 definitions.
+
+LidarTools_BCAL\src\lib\ReadHeaderLAS_BCAL.pro: Changed to read the common
+header first.  Then feed versionMajor and versionMinor to InitHeaderLAS_BCAL.
+
+LidarTools_BCAL\src\lib\ReadLAS_BCAL.pro: Changed to read the common header
+first.  Then feed versionMajor and versionMinor to InitHeaderLAS_BCAL.  Changed
+fixing dataOffset.  Instead, fixing nPoints.  Added point_lun, inputLun,
+header.headerSize right after reading header in order to read records
+correctly.  Deleted uncessary records[a] = create_struct(tempRecord, 'data',
+ptr_new())  (put it back on 4/22/2016.  Otherwise, exporting LAS to ASCII will
+fail.)
+
+LidarTools_BCAL\src\procedures\wizard\Wizard_Data_Preprocess.pro
+LidarTools_BCAL\src\procedures\AsciiToLAS_BCAL.pro
+LidarTools_BCAL\src\procedures\BufferLAS_BCAL.pro
+LidarTools_BCAL\src\procedures\DecimateLAS_BCAL.pro
+LidarTools_BCAL\src\procedures\FlightlineLAS_BCAL.pro
+LidarTools_BCAL\src\procedures\SubsetLAS_BCAL.pro
+LidarTools_BCAL\src\procedures\Visualize3D_BCAL.pro
+
+LidarTools_BCAL\src\lib\InitRecordLAS_BCAL.pro Add version keywords and
+initialize record for LAS 1.4 as well
+
+LidarTools_BCAL\src\lib\RecordsToProj_BCAL.pro Add version keywords to handle
+LAS 1.4 as well
+
+LidarTools_BCAL\src\lib\InitDataLAS_BCAL.pro Changed based on Tables from 4.7
+to 4.13
+
+BCAL Task: Implement z value reprojection from feet to meters and vice versa.
+
+LidarTools_BCAL\src\procedures\ChangeZUnitLAS_BCAL.pro Added support for
+changing Z unit.  It checks if header.systemID has "Z unit: Feet".  If so, the
+data Z is in feet.
+
+LidarTools_BCAL\src\LidarTools_BCAL.pro
+LidarTools_BCAL\src\LidarTools_BCAL_Envi4x.pro
+LidarTools_BCAL\src\LidarTools_BCAL_Envi5x.pro Added a widget of "Change Z Unit
+to LAS File(s)".  Added a tool of "Assign Vegetation Height" right after
+"Create Bare-earth DEM". 4/21/2016
+
+LidarTools_BCAL\src\procedures\AssignVegHtLAS_BCAL.pro Implemented the
+capability of AssignVegHt_ui.pro in the ENVI Classic version. 4/21/2016
+
+
+4/22/2016
+
+Restored records[a] = create_struct(tempRecord, 'data', ptr_new()) back in
+LidarTools_BCAL\src\lib\ReadLAS_BCAL.pro after customer reported failure of
+exporting LAS to ASCII.
+
+Fixed the bug in the output path in
+LidarTools_BCAL\src\procedures\AssignVegHtLAS_BCAL.pro.
+
+Also added envi_report_init, base=statBase, /finish to finish the progress bar.
+
+4/25/2016
+
+ReadLAS_BCAL.pro: records = -1 changed to records = !NULL projection = -1
+changed to projection = !NULL
+
+RecordsToProj_BCAL.pro: return -1 changed to return !NULL
+
+ReadLAS_BCAL.pro: Added the versionMajor and versionMinor keywords to return
+the LAS version information
+
+procedures\AddProjectionLAS_BCAL.pro: procedures\AsciiToLAS_BCAL.pro:
+procedures\ChangeZUnitLAS_BCAL.pro: procedures\ReprojectLAS_BCAL.pro:
+
+in ChangeZUnitLAS_BCAL.pro and ReprojectLAS_BCAL.pro: Changed the logic of
+updating the array of records 
+
+Removed IDLgrColorbar__define.pro and Trackball_define.pro from lib\fsc because
+both are available in IDL.
+
+Start adding versions onto .sav file per user request.  First is
+lidartools_bcal_envi4001.sav.  Basically, lidartools_bcal_envi4001.pro was
+copied from either lidartools_bcal.pro or lidartools_bcal_envi4x.pro.  Then,
+edit lidartools_bcal_envi4001.pro to have consistent naming in main program
+LidarTools_BCAL_Envi4001 and LidarTools_BCAL_Envi4001_define_buttons Then, edit
+the project build property and make sure it is lidartools_bcal_envi4001.sav to
+be built.
+
+4/29/2016: Added NormalizeElevLAS_BCAL.pro in procedure.  Implemented the tool
+"Normalize Elevation" in lidartools_bcal_envi4002.sav.
+
+5/2/2016: FileInfoLAS_BCAL.pro Added checking negative values and warning
+message box.
